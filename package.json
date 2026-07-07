@@ -1,0 +1,17 @@
+{
+  "name": "motorcycle-wheelie-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Interactive reduction-only motorcycle wheelie-control research simulator",
+  "scripts": {
+    "dev": "node tools/serve.mjs",
+    "test": "node --test",
+    "experiment": "node tools/run-experiments.mjs",
+    "check": "node --check src/app.js && node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+
