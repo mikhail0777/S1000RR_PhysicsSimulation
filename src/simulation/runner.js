@@ -46,6 +46,8 @@ export function runSimulation(scenario, options = {}) {
     const throttle = options.throttle ?? scenario.throttle(state.time);
     if (state.time + 1e-12 >= nextControl) {
       const observation = sensor.sample(state);
+      observation.engineTorque = state.engineTorque;
+      observation.gear = scenario.gear;
       const faulted = scenario.faultWindow && state.time >= scenario.faultWindow[0] && state.time <= scenario.faultWindow[1];
       if (faulted) {
         output = { torqueCeiling: Number.POSITIVE_INFINITY, status: "command-fault", computeMs: 0 };

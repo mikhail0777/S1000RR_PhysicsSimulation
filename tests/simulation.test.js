@@ -12,7 +12,7 @@ test("simulation is deterministic for a fixed seed", () => {
 });
 
 test("every controller obeys rider positive-torque ceiling", () => {
-  for (const controller of ["none", "threshold", "pid", "delay-aware"]) {
+  for (const controller of ["none", "threshold", "pid", "delay-aware", "nmpc"]) {
     const run = runSimulation(scenarios.excessive, { controller, duration: 3 });
     for (const state of run.history) {
       assert.ok(state.permittedTorque <= Math.max(0, state.requestedTorque) + 1e-9);
