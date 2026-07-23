@@ -25,6 +25,9 @@ export function runSimulation(scenario, options = {}) {
   const config = structuredClone(options.config ?? motorcycleConfig);
   if (scenario.friction) config.tire.friction = scenario.friction;
   if (scenario.engineDelay !== undefined) config.engine.transportDelay = scenario.engineDelay;
+  if (scenario.engineResponseTime !== undefined) config.engine.responseTime = scenario.engineResponseTime;
+  if (scenario.comFromRear !== undefined) config.comFromRear = scenario.comFromRear;
+  if (scenario.comHeight !== undefined) config.comHeight = scenario.comHeight;
   const dt = options.dt ?? 0.002;
   const controllerDt = options.controllerDt ?? 0.01;
   const controllerName = options.controller ?? scenario.controller ?? "none";
@@ -41,6 +44,7 @@ export function runSimulation(scenario, options = {}) {
   let nextRecord = 0;
   const duration = options.duration ?? scenario.duration;
   const targetPitch = options.targetPitch ?? scenario.targetPitch;
+  let terminatedReason = "duration";
 
   while (state.time < duration - dt / 2) {
     const throttle = options.throttle ?? scenario.throttle(state.time);
@@ -61,7 +65,12 @@ export function runSimulation(scenario, options = {}) {
       history.push(stateSnapshot(state, output, targetPitch));
       nextRecord += options.recordDt ?? 0.01;
     }
+    if (state.unsafe) {
+      terminatedReason = "safety-envelope";
+      if (history.at(-1)?.time !== state.time) history.push(stateSnapshot(state, output, targetPitch));
+      break;
+    }
   }
-  return { scenario, controllerName, config, dt, controllerDt, history, finalState: state };
+  return { scenario, controllerName, config, dt, controllerDt, history, finalState: state, terminatedReason };
 }
 

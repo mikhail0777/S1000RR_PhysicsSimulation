@@ -6,4 +6,7 @@ results/*.json
 !results/.gitkeep
 .DS_Store
 Thumbs.db
+.edge-qa*/
+dashboard-live.png
+dashboard-demo.png
 

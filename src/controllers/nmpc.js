@@ -33,6 +33,10 @@ export class PredictiveController extends Controller {
         this.solverFailures += 1;
         return { torqueCeiling: 0, status: "solver-fallback", solverFailed: true, prediction: [] };
       }
+      if (observation.mode === "ground") {
+        this.lastCeiling = request;
+        return { torqueCeiling: request, status: "armed", solverFailed: false, prediction: [] };
+      }
       const previous = Number.isFinite(this.lastCeiling) ? this.lastCeiling : request;
       const maxStep = this.maxCeilingRate * context.controllerDt;
       const candidates = [0, 0.12, 0.25, 0.4, 0.58, 0.75, 0.9, 1]

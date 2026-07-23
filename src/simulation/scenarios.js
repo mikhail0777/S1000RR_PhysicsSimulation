@@ -21,6 +21,7 @@ export const scenarios = Object.freeze({
     gear: 1,
     targetPitch: 0.20,
     controller: "pid",
+    engineResponseTime: 0.005,
     throttle: time => ramp(time, 0.3, 1.0, 0.1, 0.9)
   },
   insufficient: {
@@ -62,6 +63,17 @@ export const scenarios = Object.freeze({
     controller: "pid",
     sensor: { pitchNoise: 0.007, rateNoise: 0.035, quantization: 0.001 },
     throttle: time => ramp(time, 0.2, 1, 0.1, 0.9)
+  },
+  centerOfMass: {
+    title: "G — Forward / high rider position",
+    duration: 7,
+    initialSpeed: 12,
+    gear: 1,
+    targetPitch: 0.18,
+    controller: "pid",
+    comFromRear: 0.77,
+    comHeight: 0.71,
+    throttle: time => ramp(time, 0.2, 1, 0.1, 0.92)
   },
   traction: {
     title: "H — Limited traction",
