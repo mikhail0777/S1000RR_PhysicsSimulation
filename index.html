@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A physically grounded motorcycle wheelie-control research simulator.">
+  <title>Motorcycle Dynamics Lab</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div><strong>Motorcycle Dynamics Lab</strong><span>K67 reduction-only control study</span></div>
+    </div>
+    <div class="run-state"><span id="run-dot"></span><span id="run-label">Paused</span><code id="sim-clock">t = 0.00 s</code></div>
+  </header>
+
+  <main>
+    <section class="hero-grid">
+      <div class="visual-panel panel">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Live rigid-body view</p><h1>Longitudinal + pitch dynamics</h1></div>
+          <div id="mode-badge" class="badge">BOTH WHEELS</div>
+        </div>
+        <canvas id="scene" width="1100" height="500" aria-label="Animated technical side view of the motorcycle"></canvas>
+        <div class="scene-legend">
+          <span><i class="dot actual"></i>Actual pitch</span>
+          <span><i class="dot target"></i>Target pitch</span>
+          <span><i class="dot force"></i>Force / contact</span>
+          <strong id="safety-label">Model envelope nominal</strong>
+        </div>
+      </div>
+
+      <aside class="control-panel panel">
+        <div class="panel-heading compact"><div><p class="eyebrow">Experiment setup</p><h2>Control desk</h2></div></div>
+        <label>Scenario<select id="scenario"></select></label>
+        <div class="two-col">
+          <label>Controller<select id="controller">
+            <option value="none">No assist</option><option value="threshold">Threshold</option>
+            <option value="pid" selected>PD + I limiter</option><option value="delay-aware">Delay-aware</option>
+            <option value="nmpc">Predictive</option>
+          </select></label>
+          <label>Gear<select id="gear"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select></label>
+        </div>
+        <label class="range-label"><span>Rider throttle <output id="throttle-value">65%</output></span><input id="throttle" type="range" min="0" max="100" value="65"></label>
+        <label class="range-label"><span>Target pitch <output id="target-value">12.0°</output></span><input id="target" type="range" min="0" max="35" step="0.5" value="12"></label>
+        <div class="two-col">
+          <label>Road μ<input id="friction" type="number" min="0.2" max="1.5" step="0.05" value="1.15"></label>
+          <label>Engine delay (ms)<input id="delay" type="number" min="0" max="400" step="5" value="0"></label>
+          <label>Pitch noise (°)<input id="noise" type="number" min="0" max="3" step="0.05" value="0"></label>
+          <label>Simulation speed<select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
+        </div>
+        <div class="button-row"><button id="play" class="primary">▶ Run</button><button id="step">Step</button><button id="restart">Restart</button></div>
+        <button id="compare" class="wide">Compare all controllers</button>
+      </aside>
+    </section>
+
+    <section class="telemetry" id="telemetry"></section>
+
+    <section class="chart-grid">
+      <article class="panel chart-panel"><div class="panel-heading compact"><div><p class="eyebrow">Attitude</p><h2>Pitch response</h2></div><span>degrees</span></div><canvas id="pitch-chart" width="760" height="300"></canvas></article>
+      <article class="panel chart-panel"><div class="panel-heading compact"><div><p class="eyebrow">Authority</p><h2>Torque path</h2></div><span>N·m engine-side</span></div><canvas id="torque-chart" width="760" height="300"></canvas></article>
+    </section>
+
+    <section class="lower-grid">
+      <article class="panel metrics-panel">
+        <div class="panel-heading compact"><div><p class="eyebrow">Run evaluation</p><h2>Outcome, not appearance</h2></div><div id="classification" class="badge neutral">NOT EVALUATED</div></div>
+        <div id="metrics" class="metric-grid"></div>
+      </article>
+      <article class="panel event-panel">
+        <div class="panel-heading compact"><div><p class="eyebrow">Hybrid state log</p><h2>Events</h2></div></div>
+        <ol id="events"><li><time>0.00 s</time><span>Simulation initialized</span></li></ol>
+      </article>
+    </section>
+
+    <section id="comparison-panel" class="panel comparison-panel" hidden>
+      <div class="panel-heading"><div><p class="eyebrow">Controlled experiment</p><h2>Same plant, same rider, different controller</h2></div><button id="close-comparison">Close</button></div>
+      <div class="table-scroll"><table><thead><tr><th>Controller</th><th>Classification</th><th>RMSE</th><th>Overshoot</th><th>Peak rate</th><th>Intervention</th><th>Compute</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
+    </section>
+
+    <section class="notice">
+      <strong>Simulation is not real-world validation.</strong>
+      <p>Parameters marked as estimates must be identified from passive measurements before any safety conclusion. This software never interfaces with a motorcycle or ECU.</p>
+      <div><button id="export-csv">Export CSV</button><button id="export-json">Export JSON</button><a href="docs/engineering-report.html">Read the engineering report →</a></div>
+    </section>
+  </main>
+
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
+
