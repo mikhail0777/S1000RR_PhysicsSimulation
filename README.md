@@ -64,7 +64,7 @@ sensor model ◄── hybrid motorcycle plant ◄── engine + drivetrain
 
 ## Verified status
 
-The current suite contains 18 deterministic tests covering force bounds, lift-off, gravity-driven touchdown, torque authority, controller fallback, timestep refinement, reproducibility and telemetry validation. `npm run check` and the complete experiment matrix were run on November 4, 2026.
+The current suite contains 18 deterministic tests covering force bounds, lift-off, gravity-driven touchdown, torque authority, controller fallback, timestep refinement, reproducibility and telemetry validation. `npm run check` and the complete 75-run experiment matrix were run on November 4, 2026.
 
 The central result is intentionally mixed: the PD controller tracks the 11.5° ideal, near-delay-free case in this model (2.54° airborne RMSE and 0.99° overshoot), while the same concept fails or becomes only partial under excessive demand, 100 ms transport delay, faults, noise and insufficient traction. The included lightweight predictive controller is a transparent research baseline and did not outperform the tuned PD controller.
 
