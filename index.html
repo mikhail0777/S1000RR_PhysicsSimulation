@@ -51,6 +51,17 @@
           <label>Pitch noise (°)<input id="noise" type="number" min="0" max="3" step="0.05" value="0"></label>
           <label>Simulation speed<select id="speed"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select></label>
         </div>
+        <details>
+          <summary>Advanced plant & controller settings</summary>
+          <div class="two-col">
+            <label>Initial speed (km/h)<input id="initial-speed" type="number" min="0" max="250" step="1" value="43"></label>
+            <label>Controller rate (Hz)<input id="controller-hz" type="number" min="10" max="500" step="10" value="100"></label>
+            <label>Total mass (kg)<input id="mass" type="number" min="160" max="400" step="1" value="272"></label>
+            <label>COM height (m)<input id="com-height" type="number" min="0.35" max="1.0" step="0.01" value="0.66"></label>
+            <label>Pitch gain Kp<input id="kp" type="number" min="0" max="600" step="5" value="180"></label>
+            <label>Rate gain Kd<input id="kd" type="number" min="0" max="200" step="2" value="48"></label>
+          </div>
+        </details>
         <div class="button-row"><button id="play" class="primary">▶ Run</button><button id="step">Step</button><button id="restart">Restart</button></div>
         <button id="compare" class="wide">Compare all controllers</button>
       </aside>

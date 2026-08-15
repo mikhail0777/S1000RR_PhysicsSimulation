@@ -12,7 +12,9 @@ const rad = degrees => degrees * Math.PI / 180;
 const controls = {
   scenario: $("#scenario"), controller: $("#controller"), throttle: $("#throttle"),
   target: $("#target"), gear: $("#gear"), friction: $("#friction"), delay: $("#delay"),
-  noise: $("#noise"), speed: $("#speed")
+  noise: $("#noise"), speed: $("#speed"), initialSpeed: $("#initial-speed"),
+  controllerHz: $("#controller-hz"), mass: $("#mass"), comHeight: $("#com-height"),
+  kp: $("#kp"), kd: $("#kd")
 };
 
 const manual = { title: "Manual rider input", duration: 30, initialSpeed: 12, gear: 1, targetPitch: rad(12), controller: "pid", throttle: () => 0.65 };
@@ -22,15 +24,19 @@ controls.scenario.innerHTML = `<option value="manual">Manual — live input</opt
 let state, config, controller, sensor, controllerOutput, history, playing = false;
 let nextControl = 0, nextRecord = 0, lastFrame = performance.now(), accumulator = 0, lastMode = "ground";
 let activeScenario = manual;
+let controllerDt = 0.01;
 
 function readSetup() {
   config = structuredClone(motorcycleConfig);
   config.tire.friction = Number(controls.friction.value);
   config.engine.transportDelay = Number(controls.delay.value) / 1000;
+  config.mass = Number(controls.mass.value);
+  config.comHeight = Number(controls.comHeight.value);
   const key = controls.scenario.value;
   activeScenario = key === "manual" ? manual : scenarios[key];
-  state = initialState(config, { speed: activeScenario.initialSpeed ?? 12, gear: Number(controls.gear.value), pitch: activeScenario.initialPitch ?? 0 });
-  controller = createController(controls.controller.value);
+  state = initialState(config, { speed: Number(controls.initialSpeed.value) / 3.6, gear: Number(controls.gear.value), pitch: activeScenario.initialPitch ?? 0 });
+  controller = createController(controls.controller.value, { kp: Number(controls.kp.value), kd: Number(controls.kd.value) });
+  controllerDt = 1 / Number(controls.controllerHz.value);
   sensor = new SensorModel({ pitchNoise: rad(Number(controls.noise.value)), rateNoise: rad(Number(controls.noise.value) * 3), seed: 42 });
   controllerOutput = { torqueCeiling: Infinity, status: "initializing", computeMs: 0 };
   history = [];
@@ -50,8 +56,8 @@ function simulate(seconds) {
       const observation = sensor.sample(state);
       observation.engineTorque = state.engineTorque;
       observation.gear = Number(controls.gear.value);
-      controllerOutput = controller.compute(observation, { targetPitch, controllerDt: 0.01, config });
-      nextControl += 0.01;
+      controllerOutput = controller.compute(observation, { targetPitch, controllerDt, config });
+      nextControl += controllerDt;
     }
     stepVehicle(state, { throttle, gear: Number(controls.gear.value), torqueCeiling: controllerOutput.torqueCeiling }, config, dt);
     if (state.time >= nextRecord - 1e-12) {
@@ -157,16 +163,16 @@ function drawChart(canvas, kind) {
 }
 
 function applyScenario() {
-  const key=controls.scenario.value;activeScenario=key==="manual"?manual:scenarios[key];controls.controller.value=activeScenario.controller;controls.gear.value=String(activeScenario.gear);controls.target.value=String(deg(activeScenario.targetPitch));controls.friction.value=String(activeScenario.friction??1.15);controls.delay.value=String((activeScenario.engineDelay??0)*1000);controls.noise.value=String(deg(activeScenario.sensor?.pitchNoise??0));readSetup();
+  const key=controls.scenario.value;activeScenario=key==="manual"?manual:scenarios[key];controls.controller.value=activeScenario.controller;controls.gear.value=String(activeScenario.gear);controls.target.value=String(deg(activeScenario.targetPitch));controls.initialSpeed.value=String(Math.round((activeScenario.initialSpeed??12)*3.6));controls.friction.value=String(activeScenario.friction??1.15);controls.delay.value=String((activeScenario.engineDelay??0)*1000);controls.noise.value=String(deg(activeScenario.sensor?.pitchNoise??0));controls.comHeight.value=String(activeScenario.comHeight??motorcycleConfig.comHeight);readSetup();
 }
 
 function download(name,content,type){const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([content],{type}));link.download=name;link.click();URL.revokeObjectURL(link.href)}
 function csv(){const keys=Object.keys(history[0]??{}).filter(k=>k!=="violations");return [keys.join(","),...history.map(row=>keys.map(k=>JSON.stringify(row[k])).join(","))].join("\n")}
 
 $("#play").onclick=()=>playing=!playing;$("#step").onclick=()=>{simulate(.02);updateAll()};$("#restart").onclick=readSetup;controls.scenario.onchange=applyScenario;
-for(const id of ["throttle","target"])controls[id].oninput=()=>updateAll();for(const id of ["controller","gear","friction","delay","noise"])controls[id].onchange=readSetup;
+for(const id of ["throttle","target"])controls[id].oninput=()=>updateAll();for(const id of ["controller","gear","friction","delay","noise","initialSpeed","controllerHz","mass","comHeight","kp","kd"])controls[id].onchange=readSetup;
 $("#export-csv").onclick=()=>download("wheelie-run.csv",csv(),"text/csv");$("#export-json").onclick=()=>download("wheelie-run.json",JSON.stringify({metadata:{model:config.identity,controller:controls.controller.value},history},null,2),"application/json");
-$("#compare").onclick=()=>{const scenario=controls.scenario.value==="manual"?{...manual,duration:6,throttle:()=>Number(controls.throttle.value)/100}:activeScenario;const rows=["none","threshold","pid","delay-aware","nmpc"].map(name=>{const run=runSimulation(scenario,{controller:name,duration:Math.min(7,scenario.duration),targetPitch:rad(Number(controls.target.value))});return{name,metrics:evaluateRun(run)}});$("#comparison-body").innerHTML=rows.map(({name,metrics:m})=>`<tr><td>${name}</td><td>${m.classification}</td><td>${m.pitchRmseDeg.toFixed(2)}°</td><td>${m.maxOvershootDeg.toFixed(2)}°</td><td>${m.maxPitchRateDegS.toFixed(1)}°/s</td><td>${m.interventionRmsNm.toFixed(1)} N·m</td><td>${m.controllerMeanComputeMs.toFixed(3)} ms</td></tr>`).join("");$("#comparison-panel").hidden=false;$("#comparison-panel").scrollIntoView({behavior:"smooth"})};
+$("#compare").onclick=()=>{const scenario=controls.scenario.value==="manual"?{...manual,duration:6,initialSpeed:Number(controls.initialSpeed.value)/3.6,throttle:()=>Number(controls.throttle.value)/100}:activeScenario;const rows=["none","threshold","pid","delay-aware","nmpc"].map(name=>{const run=runSimulation(scenario,{controller:name,config,duration:Math.min(7,scenario.duration),controllerDt,targetPitch:rad(Number(controls.target.value)),controllerOptions:{kp:Number(controls.kp.value),kd:Number(controls.kd.value)}});return{name,metrics:evaluateRun(run)}});$("#comparison-body").innerHTML=rows.map(({name,metrics:m})=>`<tr><td>${name}</td><td>${m.classification}</td><td>${m.pitchRmseDeg.toFixed(2)}°</td><td>${m.maxOvershootDeg.toFixed(2)}°</td><td>${m.maxPitchRateDegS.toFixed(1)}°/s</td><td>${m.interventionRmsNm.toFixed(1)} N·m</td><td>${m.controllerMeanComputeMs.toFixed(3)} ms</td></tr>`).join("");$("#comparison-panel").hidden=false;$("#comparison-panel").scrollIntoView({behavior:"smooth"})};
 $("#close-comparison").onclick=()=>$("#comparison-panel").hidden=true;
 
 readSetup();
