@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { motorcycleConfig } from "../config/motorcycle.js";
-import { initialState, stepVehicle } from "../src/physics/vehicle.js";
+import { calculateNormalLoads, initialState, mechanicalEnergy, stepVehicle } from "../src/physics/vehicle.js";
 import { tireForce } from "../src/physics/tires.js";
 
 const cloneConfig = () => structuredClone(motorcycleConfig);
@@ -65,5 +65,27 @@ test("mass increase reduces acceleration under the same tire force state", () =>
   stepVehicle(a, { throttle: 0.5, gear: 2 }, light, 0.001);
   stepVehicle(b, { throttle: 0.5, gear: 2 }, heavy, 0.001);
   assert.ok(a.acceleration > b.acceleration);
+});
+
+test("analytical load transfer reaches zero front load at the lift threshold", () => {
+  const config = cloneConfig();
+  const criticalAcceleration = config.gravity * config.comFromRear / config.comHeight;
+  const below = calculateNormalLoads(config, criticalAcceleration * 0.9);
+  const atLimit = calculateNormalLoads(config, criticalAcceleration);
+  assert.ok(below.front > 0);
+  assert.ok(Math.abs(atLimit.unconstrainedFront) < 1e-9);
+});
+
+test("unpowered motion does not gain unexplained mechanical energy", () => {
+  const config = cloneConfig();
+  const state = initialState(config, { speed: 20, gear: 3 });
+  const initial = mechanicalEnergy(state, config);
+  for (let index = 0; index < 1500; index += 1) {
+    stepVehicle(state, { throttle: 0, gear: 3, torqueCeiling: 0 }, config, 0.001);
+  }
+  assert.ok(state.mechanicalEnergy <= initial * 1.001,
+    `coasting energy grew from ${initial} J to ${state.mechanicalEnergy} J`);
+  assert.ok(state.aerodynamicLoss > 0);
+  assert.ok(state.rollingLoss > 0);
 });
 

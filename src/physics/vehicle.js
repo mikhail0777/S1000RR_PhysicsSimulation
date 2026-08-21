@@ -6,7 +6,7 @@ const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
 export function initialState(config, options = {}) {
   const speed = options.speed ?? 15;
   const rearOmega = speed / config.rearWheelRadius;
-  return {
+  const state = {
     time: 0,
     x: 0,
     speed,
@@ -32,8 +32,18 @@ export function initialState(config, options = {}) {
     unsafe: false,
     constraintViolations: [],
     delayedTorque: 0,
-    commandQueue: []
+    commandQueue: [],
+    drivetrainWork: 0,
+    aerodynamicLoss: 0,
+    rollingLoss: 0,
+    slipLoss: 0,
+    impactLoss: 0,
+    mechanicalEnergy: 0,
+    energyResidual: 0
   };
+  state.mechanicalEnergy = mechanicalEnergy(state, config);
+  state.initialMechanicalEnergy = state.mechanicalEnergy;
+  return state;
 }
 
 export function totalRatio(config, gear) {
@@ -49,6 +59,26 @@ export function geometryAtPitch(config, pitch) {
     comHeight: config.rearWheelRadius + b * Math.sin(pitch) + h * Math.cos(pitch),
     frontClearance: Math.max(0, config.wheelbase * Math.sin(pitch))
   };
+}
+
+export function calculateNormalLoads(config, acceleration) {
+  const front = (config.mass * config.gravity * config.comFromRear -
+    config.mass * acceleration * config.comHeight) / config.wheelbase;
+  return {
+    front: Math.max(0, front),
+    rear: Math.max(0, config.mass * config.gravity - Math.max(0, front)),
+    unconstrainedFront: front
+  };
+}
+
+export function mechanicalEnergy(state, config) {
+  const relativeHeight = config.comFromRear * Math.sin(state.pitch) +
+    config.comHeight * (Math.cos(state.pitch) - 1);
+  return 0.5 * config.mass * state.speed ** 2 +
+    0.5 * config.rearWheelInertia * state.rearOmega ** 2 +
+    0.5 * config.frontWheelInertia * state.frontOmega ** 2 +
+    0.5 * config.pitchInertia * state.pitchRate ** 2 +
+    config.mass * config.gravity * relativeHeight;
 }
 
 /**
@@ -93,12 +123,10 @@ export function stepVehicle(state, input, config, dt) {
   state.rearOmega = Math.max(0, state.rearOmega + rearAlpha * dt);
 
   if (state.mode === "ground") {
-    const frontNormal = (
-      config.mass * config.gravity * config.comFromRear -
-      config.mass * state.acceleration * config.comHeight
-    ) / config.wheelbase;
-    state.frontNormal = Math.max(0, frontNormal);
-    state.rearNormal = Math.max(0, config.mass * config.gravity - state.frontNormal);
+    const loads = calculateNormalLoads(config, state.acceleration);
+    const frontNormal = loads.unconstrainedFront;
+    state.frontNormal = loads.front;
+    state.rearNormal = loads.rear;
     state.pitch = 0;
     state.pitchRate = 0;
     state.frontClearance = 0;
@@ -122,16 +150,27 @@ export function stepVehicle(state, input, config, dt) {
     // Small bearing drag while airborne.
     state.frontOmega = Math.max(0, state.frontOmega * Math.exp(-0.015 * dt));
     if (state.pitch <= 0 && state.pitchRate < 0) {
+      const preImpactEnergy = mechanicalEnergy(state, config);
       state.pitch = 0;
       state.frontClearance = 0;
       state.pitchRate = Math.max(0, -state.pitchRate * config.restitution);
       state.mode = "ground";
       state.frontOmega = state.speed / config.frontWheelRadius;
+      state.impactLoss += Math.max(0, preImpactEnergy - mechanicalEnergy(state, config));
     }
   }
 
   state.speed = Math.max(0, state.speed + state.acceleration * dt);
   state.x += state.speed * dt;
+  state.drivetrainWork += state.wheelTorque * state.rearOmega * dt;
+  state.aerodynamicLoss += Math.max(0, aero * state.speed) * dt;
+  state.rollingLoss += (Math.abs(rolling * state.speed) + Math.abs(wheelLoss * state.rearOmega)) * dt;
+  state.slipLoss += Math.max(0, state.tireForce *
+    (state.rearOmega * config.rearWheelRadius - state.speed)) * dt;
+  state.mechanicalEnergy = mechanicalEnergy(state, config);
+  const explainedEnergy = state.initialMechanicalEnergy + state.drivetrainWork -
+    state.aerodynamicLoss - state.rollingLoss - state.slipLoss - state.impactLoss;
+  state.energyResidual = state.mechanicalEnergy - explainedEnergy;
   state.unsafe = state.pitch >= config.safety.maxPitch || Math.abs(state.pitchRate) >= config.safety.maxPitchRate;
   state.constraintViolations = [];
   if (state.permittedTorque > Math.max(0, state.requestedTorque) + 1e-9) {

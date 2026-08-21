@@ -17,6 +17,8 @@ export function stateSnapshot(state, controllerOutput, targetPitch) {
     intervention: state.intervention, unsafe: state.unsafe,
     controllerStatus: controllerOutput.status,
     computeMs: controllerOutput.computeMs ?? 0,
+    mechanicalEnergy: state.mechanicalEnergy,
+    energyResidual: state.energyResidual,
     violations: [...state.constraintViolations]
   };
 }
