@@ -60,9 +60,14 @@
             <label>COM height (m)<input id="com-height" type="number" min="0.35" max="1.0" step="0.01" value="0.66"></label>
             <label>Pitch gain Kp<input id="kp" type="number" min="0" max="600" step="5" value="180"></label>
             <label>Rate gain Kd<input id="kd" type="number" min="0" max="200" step="2" value="48"></label>
+            <label>Engine response (ms)<input id="engine-response" type="number" min="1" max="500" step="5" value="90"></label>
+            <label>Sensor latency (ms)<input id="sensor-latency" type="number" min="0" max="500" step="5" value="0"></label>
+            <label>Pitch bias (°)<input id="sensor-bias" type="number" min="-5" max="5" step="0.05" value="0"></label>
+            <label>Dropout probability (%)<input id="sensor-dropout" type="number" min="0" max="100" step="1" value="0"></label>
+            <label>Quantization (°)<input id="sensor-quantization" type="number" min="0" max="2" step="0.01" value="0"></label>
           </div>
         </details>
-        <div class="button-row"><button id="play" class="primary">▶ Run</button><button id="step">Step</button><button id="restart">Restart</button></div>
+        <div class="button-row"><button id="play" class="primary">▶ Run</button><button id="step">Step</button><button id="restart">Restart</button><button id="inject-fault">Fault</button></div>
         <button id="compare" class="wide">Compare all controllers</button>
       </aside>
     </section>
