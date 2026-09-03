@@ -5,10 +5,14 @@ import { SensorModel } from "./sensors/model.js";
 import { evaluateRun } from "./analysis/metrics.js";
 import { runSimulation, stateSnapshot } from "./simulation/runner.js";
 import { scenarios } from "./simulation/scenarios.js";
+import { compareTelemetry, parseTelemetryCsv } from "./telemetry/import.js";
 
 const $ = selector => document.querySelector(selector);
 const deg = radians => radians * 180 / Math.PI;
 const rad = degrees => degrees * Math.PI / 180;
+const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+})[character]);
 const controls = {
   scenario: $("#scenario"), controller: $("#controller"), throttle: $("#throttle"),
   target: $("#target"), gear: $("#gear"), friction: $("#friction"), delay: $("#delay"),
@@ -28,6 +32,7 @@ let nextControl = 0, nextRecord = 0, lastFrame = performance.now(), accumulator 
 let activeScenario = manual;
 let controllerDt = 0.01;
 let faultUntil = -1;
+let measuredTelemetry = null;
 
 function readSetup() {
   config = structuredClone(motorcycleConfig);
@@ -175,7 +180,7 @@ function drawChart(canvas, kind) {
   const data=history.slice(-800);if(data.length<2)return;const minT=data[0].time,maxT=data.at(-1).time||1;let series,yMin,yMax;
   if(kind==="pitch"){series=[["#ff6b2c",d=>deg(d.pitch)],["#62d4e8",d=>deg(d.targetPitch)]];yMin=Math.min(-2,...data.map(d=>deg(d.pitch)));yMax=Math.max(15,...data.map(d=>deg(d.pitch)),...data.map(d=>deg(d.targetPitch)));}
   else{series=[["#f7c552",d=>d.requestedTorque],["#62d4e8",d=>d.permittedTorque],["#ff6b2c",d=>d.engineTorque]];yMin=Math.min(-30,...data.map(d=>d.engineTorque));yMax=Math.max(120,...data.map(d=>d.requestedTorque));}
-  const x=d=>pad.l+(d.time-minT)/Math.max(.01,maxT-minT)*(width-pad.l-pad.r),y=v=>height-pad.b-(v-yMin)/(yMax-yMin)*(height-pad.t-pad.b);for(const[color,get]of series){ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();data.forEach((d,i)=>i?ctx.lineTo(x(d),y(get(d))):ctx.moveTo(x(d),y(get(d))));ctx.stroke()}ctx.fillStyle="#748894";ctx.font="10px Consolas";ctx.fillText(yMax.toFixed(0),6,pad.t+4);ctx.fillText(yMin.toFixed(0),6,height-pad.b);ctx.fillText(`${Math.max(0,maxT-minT).toFixed(1)} s window`,width-90,height-8);
+  const x=d=>pad.l+(d.time-minT)/Math.max(.01,maxT-minT)*(width-pad.l-pad.r),y=v=>height-pad.b-(v-yMin)/(yMax-yMin)*(height-pad.t-pad.b);for(const[color,get]of series){ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();data.forEach((d,i)=>i?ctx.lineTo(x(d),y(get(d))):ctx.moveTo(x(d),y(get(d))));ctx.stroke()}if(kind==="pitch"&&measuredTelemetry?.channels.pitch){const measured=measuredTelemetry.rows.filter(d=>d.pitch!==null&&d.time>=minT&&d.time<=maxT);ctx.strokeStyle="#d88cff";ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();measured.forEach((d,i)=>i?ctx.lineTo(x(d),y(deg(d.pitch))):ctx.moveTo(x(d),y(deg(d.pitch))));ctx.stroke();ctx.setLineDash([])}ctx.fillStyle="#748894";ctx.font="10px Consolas";ctx.fillText(yMax.toFixed(0),6,pad.t+4);ctx.fillText(yMin.toFixed(0),6,height-pad.b);ctx.fillText(`${Math.max(0,maxT-minT).toFixed(1)} s window`,width-90,height-8);
 }
 
 function applyScenario() {
@@ -191,6 +196,10 @@ $("#inject-fault").onclick=()=>{faultUntil=state.time+0.5;logEvent("Controller c
 $("#export-csv").onclick=()=>download("wheelie-run.csv",csv(),"text/csv");$("#export-json").onclick=()=>download("wheelie-run.json",JSON.stringify({metadata:{model:config.identity,controller:controls.controller.value},history},null,2),"application/json");
 $("#compare").onclick=()=>{const scenario=controls.scenario.value==="manual"?{...manual,duration:6,initialSpeed:Number(controls.initialSpeed.value)/3.6,throttle:()=>Number(controls.throttle.value)/100}:activeScenario;const rows=["none","threshold","pid","delay-aware","nmpc"].map(name=>{const run=runSimulation(scenario,{controller:name,config,duration:Math.min(7,scenario.duration),controllerDt,targetPitch:rad(Number(controls.target.value)),controllerOptions:{kp:Number(controls.kp.value),kd:Number(controls.kd.value)}});return{name,metrics:evaluateRun(run)}});$("#comparison-body").innerHTML=rows.map(({name,metrics:m})=>`<tr><td>${name}</td><td>${m.classification}</td><td>${m.pitchRmseDeg.toFixed(2)}°</td><td>${m.maxOvershootDeg.toFixed(2)}°</td><td>${m.maxPitchRateDegS.toFixed(1)}°/s</td><td>${m.interventionRmsNm.toFixed(1)} N·m</td><td>${m.controllerMeanComputeMs.toFixed(3)} ms</td></tr>`).join("");$("#comparison-panel").hidden=false;$("#comparison-panel").scrollIntoView({behavior:"smooth"})};
 $("#close-comparison").onclick=()=>$("#comparison-panel").hidden=true;
+$("#telemetry-file").onchange=async event=>{
+  const file=event.target.files[0];if(!file)return;const result=$("#telemetry-import-result");
+  try{measuredTelemetry=parseTelemetryCsv(await file.text());const channels=Object.keys(measuredTelemetry.channels).join(", ");const missing=measuredTelemetry.missingChannels.join(", ")||"none";let errorRows="";if(history.length){const errors=compareTelemetry(measuredTelemetry,history);errorRows=Object.entries(errors).map(([channel,value])=>`<tr><td>${channel}</td><td>${value.rmse.toFixed(4)}</td><td>${value.samples}</td></tr>`).join("")}result.innerHTML=`<p><strong>${escapeHtml(file.name)}</strong> — ${measuredTelemetry.rows.length} rows over ${measuredTelemetry.duration.toFixed(3)} s.</p><p class="caption">Channels: ${channels}. Missing optional channels: ${missing}.</p>${errorRows?`<table><thead><tr><th>Channel</th><th>RMSE (channel units)</th><th>Samples</th></tr></thead><tbody>${errorRows}</tbody></table>`:"<p class=\"caption\">Run the simulator, then select the file again to calculate measured-versus-simulated errors.</p>"}`;updateAll()}catch(error){measuredTelemetry=null;result.innerHTML=`<p style="color:var(--red)"><strong>Import failed:</strong> ${escapeHtml(error.message)}</p>`}
+};
 
 readSetup();
 const query = new URLSearchParams(location.search);

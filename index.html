@@ -95,6 +95,11 @@
       <div class="table-scroll"><table><thead><tr><th>Controller</th><th>Classification</th><th>RMSE</th><th>Overshoot</th><th>Peak rate</th><th>Intervention</th><th>Compute</th></tr></thead><tbody id="comparison-body"></tbody></table></div>
     </section>
 
+    <section class="panel comparison-panel">
+      <div class="panel-heading"><div><p class="eyebrow">Offline validation</p><h2>Passive telemetry comparison</h2></div><input id="telemetry-file" type="file" accept=".csv,text/csv"></div>
+      <div id="telemetry-import-result" class="table-scroll"><p class="caption">Choose a local CSV with an increasing <code>time_s</code> column. Supported optional channels include <code>engine_rpm</code>, <code>throttle_pct</code>, <code>pitch_deg</code>, and front/rear wheel speed in m/s. Files remain in this browser.</p></div>
+    </section>
+
     <section class="notice">
       <strong>Simulation is not real-world validation.</strong>
       <p>Parameters marked as estimates must be identified from passive measurements before any safety conclusion. This software never interfaces with a motorcycle or ECU.</p>
