@@ -11,6 +11,13 @@ export function evaluateRun(run, tolerance = 2 * Math.PI / 180) {
   const maxPitch = Math.max(...samples.map(item => item.pitch));
   const lifted = samples.some(item => item.mode === "wheelie");
   const requestedSupport = tracking.filter(item => item.controllerStatus === "insufficient-rider-demand").length;
+  let settlingTime = null;
+  for (let index = 0; index < tracking.length; index += 1) {
+    if (tracking.slice(index).every(item => Math.abs(item.pitch - item.targetPitch) <= tolerance)) {
+      settlingTime = tracking[index].time - tracking[0].time;
+      break;
+    }
+  }
   let classification = "limited/partial tracking";
   if (!lifted && run.scenario.targetPitch > tolerance) classification = "physically unreachable target";
   else if (violations > 0 || samples.some(item => item.unsafe)) classification = "safety constraint failure";
@@ -23,13 +30,16 @@ export function evaluateRun(run, tolerance = 2 * Math.PI / 180) {
     maxPitchDeg: maxPitch * 180 / Math.PI,
     maxPitchRateDegS: Math.max(...samples.map(item => Math.abs(item.pitchRate))) * 180 / Math.PI,
     timeWithinTolerance: within * (run.history[1]?.time - run.history[0]?.time || 0),
+    settlingTime,
     interventionRmsNm: Math.sqrt(mean(samples.map(item => item.intervention ** 2))),
     saturationDuration: samples.filter(item => item.permittedTorque <= 1e-6 && item.requestedTorque > 0).length *
       (run.history[1]?.time - run.history[0]?.time || 0),
     constraintViolations: violations,
     controllerMeanComputeMs: mean(samples.map(item => item.computeMs)),
     controllerMaxComputeMs: Math.max(...samples.map(item => item.computeMs)),
+    solverFailureRate: samples.filter(item => item.solverFailed).length / samples.length,
     frontLifted: lifted
   };
 }
+
 

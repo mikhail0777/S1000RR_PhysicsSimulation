@@ -2,6 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { scenarios } from "../src/simulation/scenarios.js";
 import { runSimulation } from "../src/simulation/runner.js";
 import { evaluateRun } from "../src/analysis/metrics.js";
+import { rankControllers } from "../src/analysis/ranking.js";
 
 const controllers = ["none", "threshold", "pid", "delay-aware", "nmpc"];
 const selected = process.argv[2] && scenarios[process.argv[2]] ? { [process.argv[2]]: scenarios[process.argv[2]] } : scenarios;
@@ -30,10 +31,22 @@ await mkdir("results", { recursive: true });
 await writeFile("results/comparison.json", JSON.stringify({ generatedAt: new Date().toISOString(), rows }, null, 2));
 const keys = [...new Set(rows.flatMap(row => Object.keys(row)))];
 await writeFile("results/comparison.csv", [keys.join(","), ...rows.map(row => keys.map(key => JSON.stringify(row[key] ?? "")).join(","))].join("\n"));
+const summary = rankControllers(rows);
+await writeFile("results/summary.json", JSON.stringify({ generatedAt: new Date().toISOString(), ...summary }, null, 2));
+const summaryKeys = Object.keys(summary.ranking[0] ?? {});
+await writeFile("results/summary.csv", [summaryKeys.join(","), ...summary.ranking.map(row =>
+  summaryKeys.map(key => JSON.stringify(row[key] ?? "")).join(","))].join("\n"));
 console.table(rows.filter(row => row.scenario !== "monte-carlo").map(row => ({
   scenario: row.scenario, controller: row.controller, outcome: row.classification,
   rmse_deg: row.pitchRmseDeg.toFixed(2), overshoot_deg: row.maxOvershootDeg.toFixed(2),
   intervention_nm: row.interventionRmsNm.toFixed(1)
 })));
-console.log(`\nWrote ${rows.length} runs to results/comparison.{json,csv}`);
+console.log("\nController ranking (lower score is better):");
+console.table(summary.ranking.map(row => ({ rank: row.rank, controller: row.controller,
+  score: row.score.toFixed(2), feasible: row.feasible, limited: row.limited,
+  safety_failures: row.safetyFailures, mean_rmse_deg: row.meanRmseDeg.toFixed(2) })));
+if (summary.excludedScenarios.length) {
+  console.log(`Excluded as universally unreachable: ${summary.excludedScenarios.join(", ")}`);
+}
+console.log(`\nWrote ${rows.length} runs to comparison.{json,csv} and ranked summary.{json,csv}`);
 
