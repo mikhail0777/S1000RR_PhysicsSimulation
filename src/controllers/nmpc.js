@@ -13,7 +13,7 @@ export class PredictiveController extends Controller {
     super(options);
     this.horizon = options.horizon ?? 0.6;
     this.nodes = options.nodes ?? 15;
-    this.maxCeilingRate = options.maxCeilingRate ?? 650;
+    this.maxCeilingRate = options.maxCeilingRate ?? 1800;
     this.lastCeiling = Number.POSITIVE_INFINITY;
     this.solverFailures = 0;
     this.prediction = [];
@@ -43,9 +43,15 @@ export class PredictiveController extends Controller {
         .map(fraction => request * fraction)
         .map(value => clamp(value, Math.max(0, previous - maxStep), Math.min(request, previous + maxStep)));
       let best = null;
-      for (const ceiling of new Set(candidates)) {
-        const trial = this.predict(observation, context, ceiling, previous);
-        if (!best || trial.cost < best.cost) best = trial;
+      const futureFractions = [0.15, 0.35, 0.55, 0.75, 1];
+      for (const firstCeiling of new Set(candidates)) {
+        for (const middleFraction of futureFractions) {
+          for (const terminalFraction of futureFractions) {
+            const sequence = [firstCeiling, request * middleFraction, request * terminalFraction];
+            const trial = this.predict(observation, context, sequence, previous);
+            if (!best || trial.cost < best.cost) best = trial;
+          }
+        }
       }
       if (!best || !Number.isFinite(best.cost)) {
         this.solverFailures += 1;
@@ -65,16 +71,28 @@ export class PredictiveController extends Controller {
     });
   }
 
-  predict(observation, context, ceiling, previous) {
+  predict(observation, context, sequence, previous) {
     const { config, targetPitch } = context;
     const step = this.horizon / this.nodes;
     let pitch = observation.pitch;
     let rate = observation.pitchRate;
-    let actualTorque = observation.engineTorque ?? ceiling;
+    let actualTorque = observation.engineTorque ?? sequence[0];
+    let commandedCeiling = previous;
     let cost = 0;
     const trajectory = [];
+    const delayNodes = Math.max(0, Math.round(config.engine.transportDelay / step));
+    const commandQueue = Array(delayNodes).fill(previous);
+    let firstAppliedCeiling = null;
     for (let index = 0; index < this.nodes; index += 1) {
-      actualTorque += (ceiling - actualTorque) * Math.min(1, step / config.engine.responseTime);
+      const segment = Math.min(sequence.length - 1, Math.floor(index * sequence.length / this.nodes));
+      const previousCommand = commandedCeiling;
+      const commandStep = this.maxCeilingRate * step;
+      commandedCeiling = clamp(sequence[segment], Math.max(0, commandedCeiling - commandStep),
+        Math.min(observation.requestedTorque, commandedCeiling + commandStep));
+      if (firstAppliedCeiling === null) firstAppliedCeiling = commandedCeiling;
+      commandQueue.push(commandedCeiling);
+      const delayedCeiling = commandQueue.shift();
+      actualTorque += (delayedCeiling - actualTorque) * Math.min(1, step / config.engine.responseTime);
       const ratio = config.drivetrain.primaryRatio * config.drivetrain.gearRatios[(observation.gear ?? 2) - 1] *
         config.drivetrain.finalDriveRatio * config.drivetrain.efficiency;
       const driveForce = clamp(actualTorque * ratio / config.rearWheelRadius,
@@ -87,14 +105,18 @@ export class PredictiveController extends Controller {
       rate += angularAcceleration * step;
       pitch += rate * step;
       const error = pitch - targetPitch;
-      const intervention = Math.max(0, observation.requestedTorque - ceiling);
-      const slew = ceiling - previous;
-      cost += 1400 * error * error + 70 * rate * rate + 0.002 * intervention * intervention + 0.004 * slew * slew;
+      const intervention = Math.max(0, observation.requestedTorque - commandedCeiling);
+      const slew = commandedCeiling - previousCommand;
+      cost += 1800 * error * error + 85 * rate * rate + 0.0015 * intervention * intervention + 0.003 * slew * slew;
       if (pitch > config.safety.warningPitch) cost += 1e5 * (pitch - config.safety.warningPitch + 0.01) ** 2;
+      if (pitch > targetPitch + 0.2) cost += 2e4 * (pitch - targetPitch - 0.2) ** 2;
       if (pitch < -0.02) cost += 2e4 * pitch * pitch;
-      trajectory.push({ time: observation.time + (index + 1) * step, pitch, pitchRate: rate });
+      trajectory.push({ time: observation.time + (index + 1) * step, pitch, pitchRate: rate,
+        torqueCeiling: commandedCeiling });
     }
-    return { ceiling, cost, trajectory };
+    const terminalError = pitch - targetPitch;
+    cost += 5000 * terminalError * terminalError + 250 * rate * rate;
+    return { ceiling: firstAppliedCeiling, cost, trajectory, sequence };
   }
 }
 
