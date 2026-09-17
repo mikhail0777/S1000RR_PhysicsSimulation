@@ -21,7 +21,8 @@ export class SensorModel {
       rateNoise: options.rateNoise ?? 0,
       pitchBias: options.pitchBias ?? 0,
       quantization: options.quantization ?? 0,
-      dropoutProbability: options.dropoutProbability ?? 0
+      dropoutProbability: options.dropoutProbability ?? 0,
+      timestampJitter: options.timestampJitter ?? 0
     };
     this.random = mulberry32(options.seed ?? 42);
     this.history = [];
@@ -41,7 +42,8 @@ export class SensorModel {
       mode: state.mode
     };
     this.history.push(snapshot);
-    const targetTime = state.time - this.options.latency;
+    const jitter = (this.random() * 2 - 1) * this.options.timestampJitter;
+    const targetTime = state.time - this.options.latency - jitter;
     let delayed = this.history[0];
     for (const item of this.history) {
       if (item.time <= targetTime) delayed = item;

@@ -20,7 +20,8 @@ const controls = {
   controllerHz: $("#controller-hz"), mass: $("#mass"), comHeight: $("#com-height"),
   kp: $("#kp"), kd: $("#kd"), engineResponse: $("#engine-response"),
   sensorLatency: $("#sensor-latency"), sensorBias: $("#sensor-bias"),
-  sensorDropout: $("#sensor-dropout"), sensorQuantization: $("#sensor-quantization")
+  sensorDropout: $("#sensor-dropout"), sensorQuantization: $("#sensor-quantization"),
+  sensorJitter: $("#sensor-jitter")
 };
 
 const manual = { title: "Manual rider input", duration: 30, initialSpeed: 12, gear: 1, targetPitch: rad(12), controller: "pid", throttle: () => 0.65 };
@@ -53,6 +54,7 @@ function readSetup() {
     pitchBias: rad(Number(controls.sensorBias.value)),
     dropoutProbability: Number(controls.sensorDropout.value) / 100,
     quantization: rad(Number(controls.sensorQuantization.value)),
+    timestampJitter: Number(controls.sensorJitter.value) / 1000,
     seed: 42
   });
   controllerOutput = { torqueCeiling: Infinity, status: "initializing", computeMs: 0 };
@@ -184,14 +186,14 @@ function drawChart(canvas, kind) {
 }
 
 function applyScenario() {
-  const key=controls.scenario.value;activeScenario=key==="manual"?manual:scenarios[key];controls.controller.value=activeScenario.controller;controls.gear.value=String(activeScenario.gear);controls.target.value=String(deg(activeScenario.targetPitch));controls.initialSpeed.value=String(Math.round((activeScenario.initialSpeed??12)*3.6));controls.friction.value=String(activeScenario.friction??1.15);controls.delay.value=String((activeScenario.engineDelay??0)*1000);controls.engineResponse.value=String((activeScenario.engineResponseTime??motorcycleConfig.engine.responseTime)*1000);controls.noise.value=String(deg(activeScenario.sensor?.pitchNoise??0));controls.sensorLatency.value=String((activeScenario.sensor?.latency??0)*1000);controls.sensorBias.value=String(deg(activeScenario.sensor?.pitchBias??0));controls.sensorDropout.value=String((activeScenario.sensor?.dropoutProbability??0)*100);controls.sensorQuantization.value=String(deg(activeScenario.sensor?.quantization??0));controls.comHeight.value=String(activeScenario.comHeight??motorcycleConfig.comHeight);readSetup();
+  const key=controls.scenario.value;activeScenario=key==="manual"?manual:scenarios[key];controls.controller.value=activeScenario.controller;controls.gear.value=String(activeScenario.gear);controls.target.value=String(deg(activeScenario.targetPitch));controls.initialSpeed.value=String(Math.round((activeScenario.initialSpeed??12)*3.6));controls.friction.value=String(activeScenario.friction??1.15);controls.delay.value=String((activeScenario.engineDelay??0)*1000);controls.engineResponse.value=String((activeScenario.engineResponseTime??motorcycleConfig.engine.responseTime)*1000);controls.noise.value=String(deg(activeScenario.sensor?.pitchNoise??0));controls.sensorLatency.value=String((activeScenario.sensor?.latency??0)*1000);controls.sensorBias.value=String(deg(activeScenario.sensor?.pitchBias??0));controls.sensorDropout.value=String((activeScenario.sensor?.dropoutProbability??0)*100);controls.sensorQuantization.value=String(deg(activeScenario.sensor?.quantization??0));controls.sensorJitter.value=String((activeScenario.sensor?.timestampJitter??0)*1000);controls.comHeight.value=String(activeScenario.comHeight??motorcycleConfig.comHeight);readSetup();
 }
 
 function download(name,content,type){const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([content],{type}));link.download=name;link.click();URL.revokeObjectURL(link.href)}
 function csv(){const keys=Object.keys(history[0]??{}).filter(k=>k!=="violations");return [keys.join(","),...history.map(row=>keys.map(k=>JSON.stringify(row[k])).join(","))].join("\n")}
 
 $("#play").onclick=()=>playing=!playing;$("#step").onclick=()=>{simulate(.02);updateAll()};$("#restart").onclick=readSetup;controls.scenario.onchange=applyScenario;
-for(const id of ["throttle","target"])controls[id].oninput=()=>updateAll();for(const id of ["controller","gear","friction","delay","noise","initialSpeed","controllerHz","mass","comHeight","kp","kd","engineResponse","sensorLatency","sensorBias","sensorDropout","sensorQuantization"])controls[id].onchange=readSetup;
+for(const id of ["throttle","target"])controls[id].oninput=()=>updateAll();for(const id of ["controller","gear","friction","delay","noise","initialSpeed","controllerHz","mass","comHeight","kp","kd","engineResponse","sensorLatency","sensorBias","sensorDropout","sensorQuantization","sensorJitter"])controls[id].onchange=readSetup;
 $("#inject-fault").onclick=()=>{faultUntil=state.time+0.5;logEvent("Controller commands unavailable for 0.5 s")};
 $("#export-csv").onclick=()=>download("wheelie-run.csv",csv(),"text/csv");$("#export-json").onclick=()=>download("wheelie-run.json",JSON.stringify({metadata:{model:config.identity,controller:controls.controller.value},history},null,2),"application/json");
 $("#compare").onclick=()=>{const scenario=controls.scenario.value==="manual"?{...manual,duration:6,initialSpeed:Number(controls.initialSpeed.value)/3.6,throttle:()=>Number(controls.throttle.value)/100}:activeScenario;const rows=["none","threshold","pid","delay-aware","nmpc"].map(name=>{const run=runSimulation(scenario,{controller:name,config,duration:Math.min(7,scenario.duration),controllerDt,targetPitch:rad(Number(controls.target.value)),controllerOptions:{kp:Number(controls.kp.value),kd:Number(controls.kd.value)}});return{name,metrics:evaluateRun(run)}});$("#comparison-body").innerHTML=rows.map(({name,metrics:m})=>`<tr><td>${name}</td><td>${m.classification}</td><td>${m.pitchRmseDeg.toFixed(2)}°</td><td>${m.maxOvershootDeg.toFixed(2)}°</td><td>${m.maxPitchRateDegS.toFixed(1)}°/s</td><td>${m.interventionRmsNm.toFixed(1)} N·m</td><td>${m.controllerMeanComputeMs.toFixed(3)} ms</td></tr>`).join("");$("#comparison-panel").hidden=false;$("#comparison-panel").scrollIntoView({behavior:"smooth"})};
