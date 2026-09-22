@@ -34,6 +34,7 @@ let activeScenario = manual;
 let controllerDt = 0.01;
 let faultUntil = -1;
 let measuredTelemetry = null;
+let replayIndex = null, replayPlaying = false, replayElapsed = 0;
 
 function readSetup() {
   config = structuredClone(motorcycleConfig);
@@ -60,6 +61,7 @@ function readSetup() {
   controllerOutput = { torqueCeiling: Infinity, status: "initializing", computeMs: 0 };
   history = [];
   nextControl = 0; nextRecord = 0; accumulator = 0; lastMode = state.mode; faultUntil = -1;
+  replayIndex = null; replayPlaying = false; replayElapsed = 0;
   $("#events").innerHTML = "";
   logEvent("Simulation initialized");
   updateAll();
@@ -111,33 +113,46 @@ function frame(now) {
   const elapsed = (now - lastFrame) / 1000;
   lastFrame = now;
   if (playing) simulate(elapsed);
+  if (replayPlaying && history.length > 1) {
+    replayElapsed += elapsed * Number(controls.speed.value);
+    const replayStart = history[0].time;
+    while (replayIndex < history.length - 1 && history[replayIndex + 1].time <= replayStart + replayElapsed) {
+      replayIndex += 1;
+    }
+    if (replayIndex >= history.length - 1) replayPlaying = false;
+  }
   updateAll();
   requestAnimationFrame(frame);
 }
 
 function updateAll() {
-  $("#sim-clock").textContent = `t = ${state.time.toFixed(2)} s`;
-  $("#run-label").textContent = playing ? "Running" : "Paused";
-  $(".run-state").classList.toggle("live", playing);
+  const view = replayIndex === null ? state : history[replayIndex] ?? state;
+  $("#sim-clock").textContent = `t = ${view.time.toFixed(2)} s`;
+  $("#run-label").textContent = playing ? "Running" : replayPlaying ? "Replaying" : replayIndex !== null ? "Replay paused" : "Paused";
+  $(".run-state").classList.toggle("live", playing || replayPlaying);
   $("#play").textContent = playing ? "❚❚ Pause" : "▶ Run";
   $("#throttle-value").textContent = `${controls.throttle.value}%`;
   $("#target-value").textContent = `${Number(controls.target.value).toFixed(1)}°`;
   const badge = $("#mode-badge");
-  badge.textContent = state.mode === "wheelie" ? "FRONT AIRBORNE" : "BOTH WHEELS";
-  badge.classList.toggle("danger", state.unsafe);
-  $("#safety-label").textContent = state.unsafe ? "Outside declared model envelope" : "Model envelope nominal";
-  $("#safety-label").style.color = state.unsafe ? "var(--red)" : "var(--green)";
-  drawScene(); drawChart($("#pitch-chart"), "pitch"); drawChart($("#torque-chart"), "torque"); updateTelemetry(); updateMetrics();
+  badge.textContent = view.mode === "wheelie" ? "FRONT AIRBORNE" : "BOTH WHEELS";
+  badge.classList.toggle("danger", view.unsafe);
+  $("#safety-label").textContent = view.unsafe ? "Outside declared model envelope" : "Model envelope nominal";
+  $("#safety-label").style.color = view.unsafe ? "var(--red)" : "var(--green)";
+  const replaySlider = $("#replay-position");
+  replaySlider.max = Math.max(0, history.length - 1); replaySlider.disabled = history.length < 2;
+  replaySlider.value = replayIndex ?? Math.max(0, history.length - 1);
+  $("#replay").textContent = replayPlaying ? "Pause replay" : "Replay";
+  drawScene(view); drawChart($("#pitch-chart"), "pitch"); drawChart($("#torque-chart"), "torque"); updateTelemetry(view); updateMetrics();
 }
 
-function updateTelemetry() {
+function updateTelemetry(view) {
   const values = [
-    ["Pitch", deg(state.pitch).toFixed(2), "deg"], ["Pitch rate", deg(state.pitchRate).toFixed(1), "deg/s"],
-    ["Speed", (state.speed * 3.6).toFixed(1), "km/h"], ["Engine", Math.round(state.engineRpm), "rpm"],
-    ["Rider request", state.requestedTorque.toFixed(1), "N·m"], ["Permitted", state.permittedTorque.toFixed(1), "N·m"],
-    ["Actual torque", state.engineTorque.toFixed(1), "N·m"], ["Rear-wheel torque", state.wheelTorque.toFixed(0), "N·m"],
-    ["Rear slip", (state.slip * 100).toFixed(1), "%"], ["Front clearance", (state.frontClearance * 1000).toFixed(0), "mm"],
-    ["Rear normal", state.rearNormal.toFixed(0), "N"], ["Controller", controllerOutput.status, `${(controllerOutput.computeMs??0).toFixed(3)} ms`]
+    ["Pitch", deg(view.pitch).toFixed(2), "deg"], ["Pitch rate", deg(view.pitchRate).toFixed(1), "deg/s"],
+    ["Speed", (view.speed * 3.6).toFixed(1), "km/h"], ["Engine", Math.round(view.engineRpm), "rpm"],
+    ["Rider request", view.requestedTorque.toFixed(1), "N·m"], ["Permitted", view.permittedTorque.toFixed(1), "N·m"],
+    ["Actual torque", view.engineTorque.toFixed(1), "N·m"], ["Rear-wheel torque", view.wheelTorque.toFixed(0), "N·m"],
+    ["Rear slip", (view.slip * 100).toFixed(1), "%"], ["Front clearance", (view.frontClearance * 1000).toFixed(0), "mm"],
+    ["Rear normal", view.rearNormal.toFixed(0), "N"], ["Controller", view.controllerStatus ?? controllerOutput.status, `${(view.computeMs??controllerOutput.computeMs??0).toFixed(3)} ms`]
   ];
   $("#telemetry").innerHTML = values.map(([label, value, unit]) => `<div class="telemetry-card"><span>${label}</span><strong>${value}</strong> <small>${unit}</small></div>`).join("");
 }
@@ -158,13 +173,13 @@ function canvasSize(canvas) {
   const ctx = canvas.getContext("2d"); ctx.setTransform(ratio,0,0,ratio,0,0); return { ctx, width: rect.width, height: rect.height };
 }
 
-function drawScene() {
+function drawScene(view) {
   const { ctx, width, height } = canvasSize($("#scene"));
   ctx.clearRect(0,0,width,height); const ground = height * .75; const scale = Math.min(width / 3.7, height / 1.55); const rearX = width * .41; const wheelR = config.rearWheelRadius * scale;
   ctx.strokeStyle="#24323b";ctx.lineWidth=1; for(let x=0;x<width;x+=42){ctx.beginPath();ctx.moveTo(x,ground);ctx.lineTo(x+22,ground+12);ctx.stroke()} ctx.strokeStyle="#53636e";ctx.beginPath();ctx.moveTo(0,ground);ctx.lineTo(width,ground);ctx.stroke();
-  ctx.save();ctx.translate(rearX,ground-wheelR);ctx.rotate(-state.pitch);
+  ctx.save();ctx.translate(rearX,ground-wheelR);ctx.rotate(-view.pitch);
   const L=config.wheelbase*scale, frontX=L; const drawWheel=(x,air=false)=>{ctx.save();ctx.translate(x,0);ctx.strokeStyle=air?"#657680":"#d5dde2";ctx.lineWidth=7;ctx.beginPath();ctx.arc(0,0,wheelR,0,Math.PI*2);ctx.stroke();ctx.strokeStyle="#4a5a64";ctx.lineWidth=1;for(let a=0;a<Math.PI*2;a+=Math.PI/4){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(Math.cos(a)*wheelR*.82,Math.sin(a)*wheelR*.82);ctx.stroke()}ctx.restore()};
-  drawWheel(0,false);drawWheel(frontX,state.mode==="wheelie");
+  drawWheel(0,false);drawWheel(frontX,view.mode==="wheelie");
   ctx.strokeStyle="#e7edf0";ctx.lineWidth=5;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(0,-4);ctx.lineTo(L*.43,-wheelR*.75);ctx.lineTo(L*.78,-wheelR*.55);ctx.lineTo(frontX,0);ctx.stroke();
   ctx.strokeStyle="#ff6b2c";ctx.lineWidth=9;ctx.beginPath();ctx.moveTo(L*.28,-wheelR*.33);ctx.lineTo(L*.52,-wheelR*1.5);ctx.lineTo(L*.75,-wheelR*.7);ctx.lineTo(L*.37,-wheelR*.72);ctx.closePath();ctx.stroke();
   ctx.fillStyle="#202c34";ctx.beginPath();ctx.ellipse(L*.49,-wheelR*.82,wheelR*.65,wheelR*.38,-.05,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#7f919d";ctx.lineWidth=2;ctx.stroke();
@@ -173,16 +188,16 @@ function drawScene() {
   const comX=config.comFromRear*scale,comY=-config.comHeight*scale;ctx.fillStyle="#62d4e8";ctx.beginPath();ctx.arc(comX,comY,6,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#62d4e8";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(comX-13,comY);ctx.lineTo(comX+13,comY);ctx.moveTo(comX,comY-13);ctx.lineTo(comX,comY+13);ctx.stroke();
   ctx.restore();
   const target=rad(Number(controls.target.value));ctx.save();ctx.translate(rearX,ground-wheelR);ctx.rotate(-target);ctx.strokeStyle="#62d4e8aa";ctx.setLineDash([6,7]);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(scale*1.05,0);ctx.stroke();ctx.restore();
-  if(state.tireForce>20){ctx.strokeStyle="#5fe0a0";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(rearX,ground+5);ctx.lineTo(rearX+Math.min(120,state.tireForce/15),ground+5);ctx.stroke();}
-  ctx.fillStyle="#8fa0ad";ctx.font="11px Consolas";ctx.fillText(`x ${state.x.toFixed(1)} m`,18,25);ctx.fillText(`Fx ${state.tireForce.toFixed(0)} N`,18,43);
+  if(view.tireForce>20){ctx.strokeStyle="#5fe0a0";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(rearX,ground+5);ctx.lineTo(rearX+Math.min(120,view.tireForce/15),ground+5);ctx.stroke();}
+  ctx.fillStyle="#8fa0ad";ctx.font="11px Consolas";ctx.fillText(`x ${view.x.toFixed(1)} m`,18,25);ctx.fillText(`Fx ${view.tireForce.toFixed(0)} N`,18,43);
 }
 
 function drawChart(canvas, kind) {
   const {ctx,width,height}=canvasSize(canvas);ctx.clearRect(0,0,width,height);const pad={l:44,r:16,t:14,b:28};ctx.strokeStyle="#26343d";ctx.lineWidth=1;for(let i=0;i<5;i++){const y=pad.t+(height-pad.t-pad.b)*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(width-pad.r,y);ctx.stroke()}
-  const data=history.slice(-800);if(data.length<2)return;const minT=data[0].time,maxT=data.at(-1).time||1;let series,yMin,yMax;
-  if(kind==="pitch"){series=[["#ff6b2c",d=>deg(d.pitch)],["#62d4e8",d=>deg(d.targetPitch)]];yMin=Math.min(-2,...data.map(d=>deg(d.pitch)));yMax=Math.max(15,...data.map(d=>deg(d.pitch)),...data.map(d=>deg(d.targetPitch)));}
+  const data=history.slice(-800);if(data.length<2)return;const minT=data[0].time;const prediction=kind==="pitch"&&replayIndex===null?(controllerOutput.prediction??[]):[];const maxT=Math.max(data.at(-1).time||1,prediction.at(-1)?.time??0);let series,yMin,yMax;
+  if(kind==="pitch"){series=[["#ff6b2c",d=>deg(d.pitch)],["#62d4e8",d=>deg(d.targetPitch)]];yMin=Math.min(-2,...data.map(d=>deg(d.pitch)),...prediction.map(d=>deg(d.pitch)));yMax=Math.max(15,...data.map(d=>deg(d.pitch)),...data.map(d=>deg(d.targetPitch)),...prediction.map(d=>deg(d.pitch)));}
   else{series=[["#f7c552",d=>d.requestedTorque],["#62d4e8",d=>d.permittedTorque],["#ff6b2c",d=>d.engineTorque]];yMin=Math.min(-30,...data.map(d=>d.engineTorque));yMax=Math.max(120,...data.map(d=>d.requestedTorque));}
-  const x=d=>pad.l+(d.time-minT)/Math.max(.01,maxT-minT)*(width-pad.l-pad.r),y=v=>height-pad.b-(v-yMin)/(yMax-yMin)*(height-pad.t-pad.b);for(const[color,get]of series){ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();data.forEach((d,i)=>i?ctx.lineTo(x(d),y(get(d))):ctx.moveTo(x(d),y(get(d))));ctx.stroke()}if(kind==="pitch"&&measuredTelemetry?.channels.pitch){const measured=measuredTelemetry.rows.filter(d=>d.pitch!==null&&d.time>=minT&&d.time<=maxT);ctx.strokeStyle="#d88cff";ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();measured.forEach((d,i)=>i?ctx.lineTo(x(d),y(deg(d.pitch))):ctx.moveTo(x(d),y(deg(d.pitch))));ctx.stroke();ctx.setLineDash([])}ctx.fillStyle="#748894";ctx.font="10px Consolas";ctx.fillText(yMax.toFixed(0),6,pad.t+4);ctx.fillText(yMin.toFixed(0),6,height-pad.b);ctx.fillText(`${Math.max(0,maxT-minT).toFixed(1)} s window`,width-90,height-8);
+  const x=d=>pad.l+(d.time-minT)/Math.max(.01,maxT-minT)*(width-pad.l-pad.r),y=v=>height-pad.b-(v-yMin)/(yMax-yMin)*(height-pad.t-pad.b);for(const[color,get]of series){ctx.strokeStyle=color;ctx.lineWidth=2;ctx.setLineDash([]);ctx.beginPath();data.forEach((d,i)=>i?ctx.lineTo(x(d),y(get(d))):ctx.moveTo(x(d),y(get(d))));ctx.stroke()}if(prediction.length){ctx.strokeStyle="#d88cff";ctx.lineWidth=2;ctx.setLineDash([6,4]);ctx.beginPath();prediction.forEach((d,i)=>i?ctx.lineTo(x(d),y(deg(d.pitch))):ctx.moveTo(x(d),y(deg(d.pitch))));ctx.stroke();ctx.setLineDash([])}if(kind==="pitch"&&measuredTelemetry?.channels.pitch){const measured=measuredTelemetry.rows.filter(d=>d.pitch!==null&&d.time>=minT&&d.time<=maxT);ctx.strokeStyle="#f7c552";ctx.lineWidth=2;ctx.setLineDash([5,4]);ctx.beginPath();measured.forEach((d,i)=>i?ctx.lineTo(x(d),y(deg(d.pitch))):ctx.moveTo(x(d),y(deg(d.pitch))));ctx.stroke();ctx.setLineDash([])}if(replayIndex!==null){const cursorX=x(history[replayIndex]??data.at(-1));ctx.strokeStyle="#ffffff88";ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cursorX,pad.t);ctx.lineTo(cursorX,height-pad.b);ctx.stroke()}ctx.fillStyle="#748894";ctx.font="10px Consolas";ctx.fillText(yMax.toFixed(0),6,pad.t+4);ctx.fillText(yMin.toFixed(0),6,height-pad.b);ctx.fillText(`${Math.max(0,maxT-minT).toFixed(1)} s window`,width-90,height-8);
 }
 
 function applyScenario() {
@@ -192,7 +207,11 @@ function applyScenario() {
 function download(name,content,type){const link=document.createElement("a");link.href=URL.createObjectURL(new Blob([content],{type}));link.download=name;link.click();URL.revokeObjectURL(link.href)}
 function csv(){const keys=Object.keys(history[0]??{}).filter(k=>k!=="violations");return [keys.join(","),...history.map(row=>keys.map(k=>JSON.stringify(row[k])).join(","))].join("\n")}
 
-$("#play").onclick=()=>playing=!playing;$("#step").onclick=()=>{simulate(.02);updateAll()};$("#restart").onclick=readSetup;controls.scenario.onchange=applyScenario;
+$("#play").onclick=()=>{replayPlaying=false;replayIndex=null;playing=!playing};
+$("#step").onclick=()=>{playing=false;replayPlaying=false;replayIndex=null;simulate(.02);updateAll()};
+$("#replay").onclick=()=>{if(history.length<2)return;playing=false;if(replayPlaying){replayPlaying=false;return}if(replayIndex===null||replayIndex>=history.length-1)replayIndex=0;replayElapsed=history[replayIndex].time-history[0].time;replayPlaying=true};
+$("#replay-position").oninput=event=>{if(!history.length)return;playing=false;replayPlaying=false;replayIndex=Number(event.target.value);replayElapsed=history[replayIndex].time-history[0].time;updateAll()};
+$("#restart").onclick=readSetup;controls.scenario.onchange=applyScenario;
 for(const id of ["throttle","target"])controls[id].oninput=()=>updateAll();for(const id of ["controller","gear","friction","delay","noise","initialSpeed","controllerHz","mass","comHeight","kp","kd","engineResponse","sensorLatency","sensorBias","sensorDropout","sensorQuantization","sensorJitter"])controls[id].onchange=readSetup;
 $("#inject-fault").onclick=()=>{faultUntil=state.time+0.5;logEvent("Controller commands unavailable for 0.5 s")};
 $("#export-csv").onclick=()=>download("wheelie-run.csv",csv(),"text/csv");$("#export-json").onclick=()=>download("wheelie-run.json",JSON.stringify({metadata:{model:config.identity,controller:controls.controller.value},history},null,2),"application/json");
