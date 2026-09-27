@@ -29,9 +29,9 @@ Batch results are written to `results/comparison.csv` and `results/comparison.js
 - Rear wheel inertia, longitudinal slip, saturating tire force, aerodynamic drag and rolling resistance.
 - Nonlinear grip-to-torque mapping, estimated torque curve, six gears, final drive, engine braking, lag, rate limit and transport delay.
 - No assist, threshold, equilibrium-feedforward PD/PID, delay-aware feedback, and constrained nonlinear forward-shooting control.
-- Sensor latency, seeded noise, bias, quantization and dropout; command interruption; parameter variation.
+- Sensor latency, seeded timestamp jitter/noise, bias, quantization and dropout; command interruption; parameter variation.
 - Pitch RMSE, overshoot, peak rate, tolerance time, intervention, saturation, constraint violations and controller timing.
-- Offline passive telemetry CSV validation and measured-versus-simulated error calculation.
+- Offline passive telemetry CSV validation, measured overlay/error calculation, and recorded-state replay.
 
 The hard authority invariant is enforced in the plant, not merely requested of controllers:
 
@@ -64,7 +64,7 @@ sensor model ◄── hybrid motorcycle plant ◄── engine + drivetrain
 
 ## Verified status
 
-The current suite contains 18 deterministic tests covering force bounds, lift-off, gravity-driven touchdown, torque authority, controller fallback, timestep refinement, reproducibility and telemetry validation. `npm run check` and the complete 75-run experiment matrix were run on November 4, 2026.
+The current suite contains 25 deterministic tests covering force and energy bounds, analytical lift-off, gravity-driven touchdown, torque authority, controller fallback, sensor timing, timestep refinement, reproducibility, ranking and telemetry validation. `npm run check` and the complete 75-run experiment matrix were run on November 4, 2026.
 
 The central result is intentionally mixed: the PD controller tracks the 11.5° ideal, near-delay-free case in this model (2.54° airborne RMSE and 0.99° overshoot), while the same concept fails or becomes only partial under excessive demand, 100 ms transport delay, faults, noise and insufficient traction. The included lightweight predictive controller is a transparent research baseline and did not outperform the tuned PD controller.
 
