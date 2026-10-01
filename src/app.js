@@ -13,6 +13,9 @@ const rad = degrees => degrees * Math.PI / 180;
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 })[character]);
+const motorcycleBody = new Image();
+motorcycleBody.src = "assets/s1000rr-k67-body.png";
+motorcycleBody.onload = () => { if (state) updateAll(); };
 const controls = {
   scenario: $("#scenario"), controller: $("#controller"), throttle: $("#throttle"),
   target: $("#target"), gear: $("#gear"), friction: $("#friction"), delay: $("#delay"),
@@ -142,7 +145,7 @@ function updateAll() {
   replaySlider.max = Math.max(0, history.length - 1); replaySlider.disabled = history.length < 2;
   replaySlider.value = replayIndex ?? Math.max(0, history.length - 1);
   $("#replay").textContent = replayPlaying ? "Pause replay" : "Replay";
-  drawScene(view); drawChart($("#pitch-chart"), "pitch"); drawChart($("#torque-chart"), "torque"); updateTelemetry(view); updateMetrics();
+  drawRenderedScene(view); drawChart($("#pitch-chart"), "pitch"); drawChart($("#torque-chart"), "torque"); updateTelemetry(view); updateMetrics();
 }
 
 function updateTelemetry(view) {
@@ -192,6 +195,103 @@ function drawScene(view) {
   ctx.fillStyle="#8fa0ad";ctx.font="11px Consolas";ctx.fillText(`x ${view.x.toFixed(1)} m`,18,25);ctx.fillText(`Fx ${view.tireForce.toFixed(0)} N`,18,43);
 }
 
+function drawRenderedWheel(ctx, x, radius, angle, airborne) {
+  ctx.save(); ctx.translate(x, 0);
+  const tire = ctx.createRadialGradient(-radius * 0.22, -radius * 0.28, radius * 0.15, 0, 0, radius);
+  tire.addColorStop(0, "#53606a"); tire.addColorStop(0.58, "#20272c"); tire.addColorStop(0.82, "#080b0d");
+  tire.addColorStop(1, airborne ? "#313b42" : "#11171a");
+  ctx.fillStyle = tire; ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = airborne ? "#6d7a82" : "#303a40"; ctx.lineWidth = Math.max(2, radius * 0.045); ctx.stroke();
+  ctx.fillStyle = "#080b0e"; ctx.beginPath(); ctx.arc(0, 0, radius * 0.73, 0, Math.PI * 2); ctx.fill();
+  ctx.save(); ctx.rotate(angle); ctx.strokeStyle = "#aeb8be"; ctx.lineWidth = Math.max(2, radius * 0.035);
+  for (let spoke = 0; spoke < 10; spoke += 1) {
+    const a = spoke * Math.PI / 5; ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * radius * 0.13, Math.sin(a) * radius * 0.13);
+    ctx.lineTo(Math.cos(a + 0.13) * radius * 0.67, Math.sin(a + 0.13) * radius * 0.67); ctx.stroke();
+  }
+  ctx.strokeStyle = "#69767e"; ctx.lineWidth = Math.max(2, radius * 0.025);
+  ctx.beginPath(); ctx.arc(0, 0, radius * 0.43, 0, Math.PI * 2); ctx.stroke();
+  for (let hole = 0; hole < 12; hole += 1) {
+    const a = hole * Math.PI / 6; ctx.fillStyle = "#101619"; ctx.beginPath();
+    ctx.arc(Math.cos(a) * radius * 0.36, Math.sin(a) * radius * 0.36, radius * 0.026, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.restore(); ctx.fillStyle = "#c9d2d6"; ctx.beginPath(); ctx.arc(0, 0, radius * 0.11, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ba2735"; ctx.beginPath();
+  ctx.roundRect(radius * 0.32, -radius * 0.18, radius * 0.12, radius * 0.3, radius * 0.04); ctx.fill();
+  ctx.strokeStyle = "#ffffff45"; ctx.lineWidth = Math.max(1, radius * 0.018);
+  ctx.beginPath(); ctx.arc(-radius * 0.08, -radius * 0.08, radius * 0.88, Math.PI * 1.08, Math.PI * 1.7); ctx.stroke();
+  ctx.restore();
+}
+
+function drawRenderedScene(view) {
+  if (!motorcycleBody.complete || !motorcycleBody.naturalWidth) { drawScene(view); return; }
+  const { ctx, width, height } = canvasSize($("#scene"));
+  const sky = ctx.createLinearGradient(0, 0, 0, height);
+  sky.addColorStop(0, "#111b24"); sky.addColorStop(0.62, "#17242d");
+  sky.addColorStop(0.63, "#0b1116"); sky.addColorStop(1, "#070a0d");
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, width, height);
+  const ground = height * 0.79;
+  const scale = Math.min(width / 3.35, height / 1.48);
+  const rearX = width * 0.31;
+  const rearRadius = config.rearWheelRadius * scale;
+  const frontRadius = config.frontWheelRadius * scale;
+  const wheelbase = config.wheelbase * scale;
+  const roadOffset = -((view.x * scale * 0.32) % 96);
+
+  ctx.strokeStyle = "#263944"; ctx.lineWidth = 2;
+  for (let x = roadOffset - 100; x < width + 100; x += 96) {
+    ctx.beginPath(); ctx.moveTo(x, ground - 74); ctx.lineTo(x + 18, ground - 110); ctx.lineTo(x + 42, ground - 74); ctx.stroke();
+  }
+  ctx.fillStyle = "#0a0e11"; ctx.fillRect(0, ground, width, height - ground);
+  ctx.strokeStyle = "#687881"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, ground); ctx.lineTo(width, ground); ctx.stroke();
+  ctx.strokeStyle = "#d9dde055"; ctx.lineWidth = 4; ctx.setLineDash([50, 45]); ctx.lineDashOffset = roadOffset;
+  ctx.beginPath(); ctx.moveTo(0, ground + 54); ctx.lineTo(width, ground + 54); ctx.stroke(); ctx.setLineDash([]);
+  if (view.speed > 8) {
+    ctx.strokeStyle = "#8ba2ae30"; ctx.lineWidth = 1;
+    for (let line = 0; line < 9; line += 1) {
+      const y = ground + 12 + line * 10; const length = Math.min(150, view.speed * 3 + line * 4);
+      const x = ((line * 173 + roadOffset * 2) % (width + 200)) - 100;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + length, y); ctx.stroke();
+    }
+  }
+
+  const clearance = Math.max(0, view.frontClearance ?? 0);
+  ctx.fillStyle = `rgba(0,0,0,${Math.max(0.08, 0.34 - clearance * 0.35)})`;
+  ctx.beginPath(); ctx.ellipse(rearX + wheelbase * 0.5, ground + 8, wheelbase * 0.58, rearRadius * 0.18, 0, 0, Math.PI * 2); ctx.fill();
+
+  ctx.save(); ctx.translate(rearX, ground - rearRadius); ctx.rotate(-view.pitch);
+  drawRenderedWheel(ctx, 0, rearRadius, view.rearWheelAngle ?? view.x / config.rearWheelRadius, false);
+  drawRenderedWheel(ctx, wheelbase, frontRadius, view.frontWheelAngle ?? view.x / config.frontWheelRadius, view.mode === "wheelie");
+
+  // Riderless red sprite calibration: transparent axle centers in source pixels.
+  const sourceRear = { x: 250, y: 720 }, sourceFrontX = 1590;
+  const bodyScale = wheelbase / (sourceFrontX - sourceRear.x);
+  ctx.drawImage(motorcycleBody, -sourceRear.x * bodyScale, -sourceRear.y * bodyScale,
+    motorcycleBody.naturalWidth * bodyScale, motorcycleBody.naturalHeight * bodyScale);
+  const comX = config.comFromRear * scale, comY = -config.comHeight * scale;
+  ctx.fillStyle = "#62d4e8"; ctx.shadowColor = "#62d4e8"; ctx.shadowBlur = 12;
+  ctx.beginPath(); ctx.arc(comX, comY, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0; ctx.restore();
+
+  const target = rad(Number(controls.target.value)); ctx.save(); ctx.translate(rearX, ground - rearRadius); ctx.rotate(-target);
+  ctx.strokeStyle = "#62d4e8aa"; ctx.lineWidth = 1.5; ctx.setLineDash([7, 7]);
+  ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(scale * 1.05, 0); ctx.stroke(); ctx.restore(); ctx.setLineDash([]);
+
+  ctx.fillStyle = "#5fe0a0"; ctx.shadowColor = "#5fe0a0"; ctx.shadowBlur = 12;
+  ctx.fillRect(rearX - rearRadius * 0.38, ground - 2, rearRadius * 0.76, 4);
+  if (view.mode === "ground") ctx.fillRect(rearX + wheelbase - frontRadius * 0.38, ground - 2, frontRadius * 0.76, 4);
+  ctx.shadowBlur = 0;
+  if (view.tireForce > 20) {
+    const arrow = Math.min(150, view.tireForce / 13); ctx.strokeStyle = "#5fe0a0"; ctx.fillStyle = "#5fe0a0"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(rearX, ground + 12); ctx.lineTo(rearX + arrow, ground + 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(rearX + arrow, ground + 12); ctx.lineTo(rearX + arrow - 10, ground + 6);
+    ctx.lineTo(rearX + arrow - 10, ground + 18); ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle = "#a8bac4"; ctx.font = "11px Consolas";
+  ctx.fillText(`${(view.speed * 3.6).toFixed(1)} km/h`, 18, 24);
+  ctx.fillText(`x ${view.x.toFixed(1)} m`, 18, 42);
+  ctx.fillText(`Fx ${view.tireForce.toFixed(0)} N`, 18, 60);
+}
+
 function drawChart(canvas, kind) {
   const {ctx,width,height}=canvasSize(canvas);ctx.clearRect(0,0,width,height);const pad={l:44,r:16,t:14,b:28};ctx.strokeStyle="#26343d";ctx.lineWidth=1;for(let i=0;i<5;i++){const y=pad.t+(height-pad.t-pad.b)*i/4;ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(width-pad.r,y);ctx.stroke()}
   const data=history.slice(-800);if(data.length<2)return;const minT=data[0].time;const prediction=kind==="pitch"&&replayIndex===null?(controllerOutput.prediction??[]):[];const maxT=Math.max(data.at(-1).time||1,prediction.at(-1)?.time??0);let series,yMin,yMax;
@@ -224,6 +324,10 @@ $("#telemetry-file").onchange=async event=>{
 
 readSetup();
 const query = new URLSearchParams(location.search);
+if (query.has("scenario") && scenarios[query.get("scenario")]) {
+  controls.scenario.value = query.get("scenario");
+  applyScenario();
+}
 if (query.get("demo") === "1") {
   for (let index = 0; index < 250; index += 1) simulate(0.02);
 }

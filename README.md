@@ -26,6 +26,7 @@ Batch results are written to `results/comparison.csv` and `results/comparison.js
 ## What is modeled
 
 - Hybrid ground / rear-contact wheelie dynamics with load-transfer lift-off and impact-like touchdown.
+- Riderless red S1000RR side-view rendering, independent rotating wheels, scrolling road and physics-driven contacts.
 - Rear wheel inertia, longitudinal slip, saturating tire force, aerodynamic drag and rolling resistance.
 - Nonlinear grip-to-torque mapping, estimated torque curve, six gears, final drive, engine braking, lag, rate limit and transport delay.
 - No assist, threshold, equilibrium-feedforward PD/PID, delay-aware feedback, and constrained nonlinear forward-shooting control.
@@ -60,6 +61,7 @@ sensor model ◄── hybrid motorcycle plant ◄── engine + drivetrain
 | Scenarios and deterministic runner | `src/simulation/` |
 | Metrics and telemetry import | `src/analysis/`, `src/telemetry/` |
 | Browser application | `index.html`, `styles.css`, `src/app.js` |
+| Project article | [`docs/article.html`](docs/article.html) / [`docs/article.md`](docs/article.md) |
 | Engineering explanation | [`docs/engineering-report.html`](docs/engineering-report.html) |
 
 ## Verified status

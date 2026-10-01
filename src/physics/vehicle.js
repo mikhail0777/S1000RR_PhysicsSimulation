@@ -15,6 +15,8 @@ export function initialState(config, options = {}) {
     pitchRate: options.pitchRate ?? 0,
     rearOmega,
     frontOmega: speed / config.frontWheelRadius,
+    rearWheelAngle: 0,
+    frontWheelAngle: 0,
     engineRpm: config.engine.idleRpm,
     engineTorque: 0,
     requestedTorque: 0,
@@ -162,6 +164,8 @@ export function stepVehicle(state, input, config, dt) {
 
   state.speed = Math.max(0, state.speed + state.acceleration * dt);
   state.x += state.speed * dt;
+  state.rearWheelAngle = (state.rearWheelAngle + state.rearOmega * dt) % (2 * Math.PI);
+  state.frontWheelAngle = (state.frontWheelAngle + state.frontOmega * dt) % (2 * Math.PI);
   state.drivetrainWork += state.wheelTorque * state.rearOmega * dt;
   state.aerodynamicLoss += Math.max(0, aero * state.speed) * dt;
   state.rollingLoss += (Math.abs(rolling * state.speed) + Math.abs(wheelLoss * state.rearOmega)) * dt;

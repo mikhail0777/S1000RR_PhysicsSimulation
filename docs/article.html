@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<meta content="ie=edge" http-equiv="X-UA-Compatible"/>
+<title>Mikhail Simanian | S1000RR Physics Simulation &amp; Wheelie Control</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+<script>
+  let FF_FOUC_FIX;
+  (function() {
+    const savedTheme = localStorage.getItem('theme') || 'modern-light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    if (savedTheme === 'terminal-green') document.documentElement.classList.add('crt');
+    if (savedTheme === 'modern-dark' || savedTheme === 'terminal-green') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  })();
+</script>
+<style>
+  *,:after,:before{box-sizing:border-box;border:0 solid #e5e7eb}
+  html{line-height:1.6;font-family:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;-webkit-text-size-adjust:100%}
+  body{margin:0;background-color:#fafafa;color:#171717;transition:background-color .15s ease,color .15s ease}
+  body.dark, html[data-theme='modern-dark'] body{background-color:#0a0a0a;color:#f5f5f5}
+  html[data-theme='terminal-green'] body{background-color:#020d04;color:#4ade80;font-family:'IBM Plex Mono',monospace}
+  html[data-theme='win95'] body{background-color:#c0c0c0;color:#000}
+  
+  .container{max-width:960px;margin:0 auto;padding:1.5rem 1rem}
+  header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:2rem;padding-bottom:1rem;border-bottom:1px solid #e5e7eb}
+  .dark header{border-bottom-color:#262626}
+  html[data-theme='terminal-green'] header{border-bottom-color:#166534}
+  
+  h1.brand{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;font-weight:700;margin:0}
+  a{color:inherit;text-decoration:none}
+  a.hover-underline:hover{text-decoration:underline}
+  
+  .theme-box{display:flex;align-items:center;border:1px solid currentColor;padding:2px 4px;font-family:'IBM Plex Mono',monospace;font-size:11px;gap:4px}
+  .theme-btn{background:none;border:1px solid currentColor;color:inherit;padding:2px 8px;font-family:'IBM Plex Mono',monospace;font-size:10px;cursor:pointer}
+  .theme-btn.active{background-color:#171717;color:#fff}
+  .dark .theme-btn.active{background-color:#fff;color:#000}
+  html[data-theme='terminal-green'] .theme-btn.active{background-color:#4ade80;color:#000}
+  
+  article h1{font-size:2.25rem;line-height:1.15;font-weight:700;margin:0 0 .5rem}
+  article h2{font-size:1.5rem;font-weight:700;margin:2.5rem 0 .75rem;padding-bottom:.35rem;border-bottom:1px solid #e5e7eb}
+  .dark article h2{border-bottom-color:#262626}
+  html[data-theme='terminal-green'] article h2{border-bottom-color:#166534}
+  article h3{font-size:1.15rem;font-weight:600;margin:1.75rem 0 .5rem}
+  article p{margin:1rem 0;line-height:1.7}
+  .subtitle{font-style:italic;font-size:1.15rem;color:#525252;margin-bottom:1.5rem}
+  .dark .subtitle{color:#a3a3a3}
+  html[data-theme='terminal-green'] .subtitle{color:#86efac}
+  
+  .img-card{margin:1.75rem 0;background:#fff;border:1px solid #e5e7eb;border-radius:4px;overflow:hidden;box-shadow:2px 2px 0 rgba(0,0,0,.08)}
+  .dark .img-card{background:#121212;border-color:#262626;box-shadow:2px 2px 0 rgba(255,255,255,.05)}
+  html[data-theme='terminal-green'] .img-card{background:#041508;border-color:#166534}
+  .img-card img{width:100%;height:auto;display:block}
+  .caption{padding:.65rem .9rem;font-size:.825rem;color:#737373;font-family:'IBM Plex Mono',monospace}
+  .dark .caption{color:#a3a3a3}
+  html[data-theme='terminal-green'] .caption{color:#86efac}
+  
+  .math-block{background:#f5f5f5;border-left:3px solid #f97316;padding:1rem 1.25rem;margin:1.25rem 0;overflow-x:auto;font-family:'IBM Plex Mono',monospace}
+  .dark .math-block{background:#171717;border-left-color:#fb923c}
+  html[data-theme='terminal-green'] .math-block{background:#05200c;border-left-color:#4ade80}
+  
+  .callout{border-left:3px solid #0284c7;background:#f0f9ff;padding:1rem 1.25rem;margin:1.25rem 0}
+  .dark .callout{background:#082f49;border-left-color:#38bdf8}
+  .callout.warn{border-left-color:#ea580c;background:#fff7ed}
+  .dark .callout.warn{background:#431407;border-left-color:#fb923c}
+  html[data-theme='terminal-green'] .callout{background:#041f0c;border-left-color:#4ade80}
+  
+  code{font-family:'IBM Plex Mono',monospace;background:#f0f0f0;padding:2px 5px;border-radius:2px;font-size:.9em}
+  .dark code{background:#262626}
+  html[data-theme='terminal-green'] code{background:#052e16;color:#86efac}
+  
+  table{width:100%;border-collapse:collapse;margin:1.5rem 0;font-size:.875rem}
+  th,td{padding:.65rem .75rem;text-align:left;border-bottom:1px solid #e5e7eb}
+  .dark th,.dark td{border-bottom-color:#262626}
+  html[data-theme='terminal-green'] th,html[data-theme='terminal-green'] td{border-bottom-color:#166534}
+  th{font-family:'IBM Plex Mono',monospace;text-transform:uppercase;font-size:.75rem;letter-spacing:.05em;color:#737373}
+  .dark th{color:#a3a3a3}
+  html[data-theme='terminal-green'] th{color:#86efac}
+  
+  fieldset{border:1px solid currentColor;padding:1rem 1.25rem;margin:2.5rem 0 1rem;font-family:'IBM Plex Mono',monospace}
+  legend{padding:0 .5rem;font-style:italic}
+  
+  .diagram-svg{background:#fff;border:1px solid #e5e7eb;border-radius:4px;padding:1rem;margin:1.5rem 0}
+  .dark .diagram-svg{background:#121212;border-color:#262626}
+  html[data-theme='terminal-green'] .diagram-svg{background:#031307;border-color:#166534}
+  .diagram-svg svg{width:100%;height:auto;display:block}
+  
+  .crt::after{content:" ";display:block;position:fixed;top:0;left:0;bottom:0;right:0;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,.25) 50%),linear-gradient(90deg,rgba(255,0,0,.04),rgba(0,255,0,.01),rgba(0,0,255,.04));z-index:999;background-size:100% 3px,6px 100%;pointer-events:none;opacity:.8}
+</style>
+<script async id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+<div class="container">
+  <header>
+    <a href="../" class="brand">Mikhail Simanian</a>
+    <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <div class="theme-box">
+        <span style="font-weight:700;font-size:10px">THEME:</span>
+        <button class="theme-btn" id="btn-theme-modern-dark" onclick="setTheme('modern-dark')">☾</button>
+        <button class="theme-btn" id="btn-theme-modern-light" onclick="setTheme('modern-light')">☀</button>
+        <button class="theme-btn" id="btn-theme-win95" onclick="setTheme('win95')">Win95</button>
+        <button class="theme-btn" id="btn-theme-terminal-green" onclick="setTheme('terminal-green')">CRT</button>
+      </div>
+      <a href="https://github.com/mikhail0777/S1000RR_PhysicsSimulation" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid currentColor;padding:2px 8px">Sim Repo ↗</a>
+      <a href="https://github.com/mikhail0777/S1000RR_ECU_Cotnroller" target="_blank" style="font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid currentColor;padding:2px 8px">ECU Repo ↗</a>
+    </div>
+  </header>
+
+  <article>
+    <h1>Simulating &amp; Engineering a Motorcycle Wheelie Controller</h1>
+    <div class="subtitle">or how to trick yourself into learning hybrid rigid-body dynamics, control theory, and embedded hardware deployment</div>
+
+    <div class="img-card">
+      <img src="images/dashboard.png" alt="Motorcycle Dynamics Lab interactive simulation dashboard" />
+      <div class="caption">Figure 1: The interactive dashboard running an 11.5° stabilized wheelie scenario at 60 FPS in JavaScript, showing contact forces, pitch telemetry, and engine torque curves.</div>
+    </div>
+
+    <p>
+      If you ask an experienced sportbike rider how to control a wheelie, the answer sounds deceptively intuitive: 
+      <em>"Give it throttle to lift the front wheel, then feather the throttle or tap the rear brake to balance it at the balance point."</em>
+    </p>
+    <p>
+      When you try to translate that intuition into an automated control system on a 205-horsepower 2020 BMW S1000RR (K67), you immediately run into a brick wall of physics and automotive control theory:
+    </p>
+    <ul>
+      <li><strong>Unstable open-loop dynamics:</strong> A motorcycle on its rear wheel is an inverted pendulum with a floating base, rotating about a rolling contact patch.</li>
+      <li><strong>The Authority Invariant:</strong> For safety and rider autonomy, the supervisory controller is strictly <strong>reduction-only</strong>. It is forbidden from adding positive torque beyond what the rider demands. If the bike begins to drop and the rider isn't twisting the grip, the required control input mathematically does not exist.</li>
+      <li><strong>Actuator &amp; Transport Lag:</strong> Internal combustion engines do not produce torque instantaneously. Electronic throttle valves, intake manifold filling, engine stroke cycles, and CAN-bus transport latency add 50–100 ms of pure delay. On an inverted pendulum accelerating at 40°/s nose-up, 100 ms of delay is more than enough time to loop backwards onto your tail.</li>
+    </ul>
+
+    <p>
+      To solve this, I designed an end-to-end engineering pipeline: beginning with a hybrid rigid-body physics simulator, developing analytical feedforward control algorithms, and ultimately building and deploying an embedded hardware interceptor onto my actual 2020 BMW S1000RR.
+    </p>
+
+    <h2>1. The Core Invariant: One-Sided Authority</h2>
+    <p>
+      In classical inverted pendulum robotics (like a Segway or cart-pole), the actuator can command positive or negative torque symmetrically: if the cart rolls left, you apply force right; if it falls backward, you apply forward torque.
+    </p>
+    <p>
+      Our supervisory controller operates under a hard one-sided constraint enforced in the vehicle plant:
+    </p>
+    <div class="math-block">
+      $$0 \le T_{\text{permitted}}^+(t) = \min\big(T_{\text{rider}}^+(t), \; T_{\text{ceiling}}(t)\big) \le T_{\text{rider}}^+(t)$$
+    </div>
+    <p>
+      The rider initiates the lift with the throttle grip. As the motorcycle approaches the target pitch angle \(\theta_{\text{ref}}\), our algorithm computes an engine torque ceiling \(T_{\text{ceiling}}\) to cap the rider's request. 
+      If the rider rolls off the throttle, the motorcycle retains full engine braking. The controller can never "whiskey throttle" the bike into an unintended acceleration.
+    </p>
+
+    <div class="callout warn">
+      <strong>The simulator is allowed to fail:</strong> If a simulated rider supplies too little throttle, or if the road has low traction (\(\mu = 0.55\)), the bike fails to lift. If actuator delay is too high, the bike flips past the 45° safety envelope. Those are valid engineering conclusions, not bugs to hide.
+    </div>
+
+    <h2>2. Governing Physics &amp; Vector Mechanics</h2>
+    <p>
+      The simulation is a hybrid rigid-body system with two discrete contact states: <strong>Ground Mode</strong> (both wheels constrained to the road) and <strong>Wheelie Mode</strong> (rear-wheel supported).
+    </p>
+
+    <div class="diagram-svg">
+      <svg viewBox="0 0 820 330" role="img" aria-label="Free-body diagram of motorcycle in wheelie mode">
+        <defs>
+          <marker id="arr-orange" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#ea580c"/></marker>
+          <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#0284c7"/></marker>
+        </defs>
+        <line x1="40" y1="275" x2="780" y2="275" stroke="#9ca3af" stroke-width="3"/>
+        <g transform="translate(180 245) rotate(-11.5)">
+          <circle cx="0" cy="0" r="48" fill="none" stroke="currentColor" stroke-width="7"/>
+          <circle cx="440" cy="0" r="48" fill="none" stroke="currentColor" stroke-width="7"/>
+          <path d="M0 0 L175 -80 L335 -45 L440 0 M175 -80 L80 -15" fill="none" stroke="currentColor" stroke-width="7"/>
+          <circle cx="210" cy="-105" r="9" fill="#0284c7"/>
+          <line x1="210" y1="-105" x2="210" y2="30" stroke="#0284c7" stroke-dasharray="5 5" stroke-width="2"/>
+          <text x="225" y="-110" font-family="'IBM Plex Mono',monospace" font-size="14" fill="#0284c7">COM (b, h)</text>
+          <path d="M260 0 A 260 260 0 0 0 255 -52" fill="none" stroke="#ea580c" stroke-width="2"/>
+          <text x="270" y="-22" font-family="'IBM Plex Mono',monospace" font-size="14" fill="#ea580c">θ</text>
+        </g>
+        <line x1="180" y1="275" x2="330" y2="275" stroke="#ea580c" stroke-width="4" marker-end="url(#arr-orange)"/>
+        <text x="215" y="305" font-family="'IBM Plex Mono',monospace" font-size="14" fill="#ea580c">Tire force Fₓ</text>
+        <line x1="385" y1="135" x2="385" y2="235" stroke="#ea580c" stroke-width="4" marker-end="url(#arr-orange)"/>
+        <text x="398" y="175" font-family="'IBM Plex Mono',monospace" font-size="14" fill="#ea580c">mg</text>
+        <line x1="180" y1="274" x2="180" y2="180" stroke="#0284c7" stroke-width="4" marker-end="url(#arr-blue)"/>
+        <text x="115" y="195" font-family="'IBM Plex Mono',monospace" font-size="14" fill="#0284c7">Nᵣ</text>
+        <line x1="615" y1="274" x2="615" y2="215" stroke="#0284c7" stroke-width="3" stroke-dasharray="4 4" marker-end="url(#arr-blue)"/>
+        <text x="630" y="225" font-family="'IBM Plex Mono',monospace" font-size="13" fill="#0284c7">N_f → 0 (Lift)</text>
+      </svg>
+      <div class="caption">Figure 2: Vector mechanics of a motorcycle undergoing longitudinal acceleration. Pitch angle \(\theta\) is measured positive nose-up.</div>
+    </div>
+
+    <h3>1. Center of Mass Trajectory</h3>
+    <p>
+      Let \(b\) be the horizontal distance from the rear wheel contact patch to the combined rider-vehicle Center of Mass (COM), and \(h\) be the height of the COM above the axle plane. As the chassis rotates by pitch angle \(\theta\):
+    </p>
+    <div class="math-block">
+      $$x_{\text{COM}}(\theta) = b \cos\theta - h \sin\theta$$
+      $$z_{\text{COM}}(\theta) = r_r + b \sin\theta + h \cos\theta$$
+    </div>
+    <p>
+      As \(\theta\) increases, \(x_{\text{COM}}\) shrinks toward zero. The balance point occurs when \(x_{\text{COM}}(\theta) = 0\), corresponding to a critical angle \(\theta_{\text{crit}} = \arctan(b / h) \approx \arctan(0.70 / 0.66) \approx 46.7^\circ\). Beyond this angle, gravity flips from a restoring torque to an overturning torque.
+    </p>
+
+    <h3>2. Ground Mode &amp; Load Transfer (Lift-Off Condition)</h3>
+    <p>
+      While both tires touch tarmac, pitch is geometrically constrained to zero (\(\theta = 0\)). Forward acceleration follows Newton's second law with aerodynamic drag and rolling resistance:
+    </p>
+    <div class="math-block">
+      $$m a = F_x - \frac{1}{2}\rho C_d A v |v| - C_{rr} m g \mathrm{sign}(v)$$
+    </div>
+    <p>
+      Dynamic load transfer redistributes vertical normal forces between front and rear axles (wheelbase \(L\)):
+    </p>
+    <div class="math-block">
+      $$N_f = \frac{m g b - m a h}{L}, \qquad N_r = m g - N_f$$
+    </div>
+    <p>
+      Front wheel lift-off occurs the exact instant \(N_f \le 0\). This defines the minimum forward acceleration needed to initiate a wheelie:
+    </p>
+    <div class="math-block">
+      $$a_{\text{lift}} \ge g \frac{b}{h} \approx 9.81 \cdot \frac{0.70}{0.66} \approx 10.4\text{ m/s}^2 \quad (\approx 1.06\text{ g})$$
+    </div>
+
+    <h3>3. Wheelie Mode (The Pitch Dynamics)</h3>
+    <p>
+      Once \(N_f = 0\), the front contact constraint vanishes and the system transitions into an inverted pendulum rotating about the rear tire patch. The moment balance yields the angular acceleration \(\ddot{\theta}\):
+    </p>
+    <div class="math-block">
+      $$I_\theta \ddot{\theta} = m a z_{\text{COM}}(\theta) - m g x_{\text{COM}}(\theta) - c_\theta \dot{\theta}$$
+    </div>
+    <p>
+      To hold a static wheelie at constant pitch (\(\ddot{\theta} = 0, \dot{\theta} = 0\)), the motorcycle must sustain an exact forward holding acceleration:
+    </p>
+    <div class="math-block">
+      $$a_{\text{hold}}(\theta) = g \frac{x_{\text{COM}}(\theta)}{z_{\text{COM}}(\theta)}$$
+    </div>
+    <p>
+      This leads to an essential physical realization: <strong>Holding a wheelie requires continuous positive acceleration.</strong> Because the center of mass remains forward of the rear axle (\(x_{\text{COM}} > 0\)), zero drive torque will cause the front end to slam down under gravity.
+    </p>
+
+    <h3>4. Tire Longitudinal Slip &amp; Saturation</h3>
+    <p>
+      Motorcycles don't transmit infinite force. Longitudinal slip ratio \(\kappa\) and tire tractive force \(F_x\) are modeled using a saturating hyperbolic tangent brush model:
+    </p>
+    <div class="math-block">
+      $$\kappa = \frac{r_r \omega_r - v}{\max(|v|, 2)}, \qquad F_x = \mu N_r \tanh\left(\frac{C_\kappa \kappa}{\mu N_r}\right)$$
+    </div>
+    <p>
+      This enforces the physical traction envelope \(|F_x| \le \mu N_r\). On wet surfaces (\(\mu = 0.55\)), the maximum available acceleration is \(\mu g = 5.4\text{ m/s}^2\), which is far below the required \(a_{\text{lift}}\). The tire simply spins, and the front wheel never lifts.
+    </p>
+
+    <h2>3. The Supervisory Control Architecture</h2>
+    <p>
+      The control loop runs every 10 ms, taking noisy, delayed sensor feedback from an onboard IMU and wheel encoders, and computing a permitted torque ceiling:
+    </p>
+
+    <div class="diagram-svg">
+      <svg viewBox="0 0 900 230" role="img" aria-label="Control loop diagram">
+        <defs>
+          <marker id="arr-m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#0284c7"/></marker>
+          <marker id="arr-o" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8z" fill="#ea580c"/></marker>
+        </defs>
+        <g font-family="'IBM Plex Mono',monospace" font-size="13">
+          <rect x="20" y="70" width="130" height="60" rx="4" fill="#fff" stroke="#ea580c" stroke-width="2"/>
+          <text x="35" y="97" font-weight="700">Rider Grip</text>
+          <text x="35" y="115" font-size="11" fill="#737373">T_rider(t)</text>
+          
+          <rect x="210" y="55" width="180" height="90" rx="4" fill="#fff" stroke="#0284c7" stroke-width="2"/>
+          <text x="225" y="85" font-weight="700">Supervisory Controller</text>
+          <text x="225" y="105" font-size="11">T_ceiling calculation</text>
+          <text x="225" y="125" font-size="11" fill="#ea580c">min(T_rider, T_ceiling)</text>
+          
+          <rect x="450" y="70" width="150" height="60" rx="4" fill="#171717" stroke="#171717"/>
+          <text x="475" y="97" fill="#fff" font-weight="700">Drivetrain</text>
+          <text x="470" y="115" fill="#9ca3af" font-size="11">Lag + Slew Rate</text>
+          
+          <rect x="660" y="70" width="190" height="60" rx="4" fill="#171717" stroke="#171717"/>
+          <text x="685" y="97" fill="#fff" font-weight="700">Hybrid Dynamics</text>
+          <text x="690" y="115" fill="#9ca3af" font-size="11">Ground / Wheelie</text>
+          
+          <path d="M150 100 H210" stroke="#ea580c" stroke-width="3" marker-end="url(#arr-o)"/>
+          <path d="M390 100 H450" stroke="#0284c7" stroke-width="3" marker-end="url(#arr-m)"/>
+          <path d="M600 100 H660" stroke="#0284c7" stroke-width="3" marker-end="url(#arr-m)"/>
+          <path d="M755 130 V190 H300 V145" fill="none" stroke="#737373" stroke-width="2" stroke-dasharray="4 4" marker-end="url(#arr-m)"/>
+          <text x="450" y="205" fill="#737373" font-size="11">Sampled [θ, dθ/dt, v, ω_r] (Noise + Delay)</text>
+        </g>
+      </svg>
+      <div class="caption">Figure 3: Closed-loop control topology enforcing the supervisor torque ceiling invariant.</div>
+    </div>
+
+    <h3>Equilibrium Feedforward + Pitch-Rate Governed PD/PID</h3>
+    <p>
+      A pure error-based PID controller fails because the reference holding torque is non-zero. Instead, we compute the analytical <strong>equilibrium holding torque</strong> \(T_{\text{eq}}(\theta)\) by projecting the holding acceleration through the transmission gear ratios and driveline efficiency \(\eta\):
+    </p>
+    <div class="math-block">
+      $$T_{\text{eq}}(\theta) = \frac{m \big(a_{\text{hold}}(\theta) + C_{rr} g + \frac{1}{2m}\rho C_d A v^2\big) r_r}{i_{\text{primary}} \cdot i_{\text{gear}} \cdot i_{\text{final}} \cdot \eta}$$
+    </div>
+    <p>
+      To prevent violent rotation when the front wheel initially leaves the tarmac, we construct a <strong>pitch-rate governor</strong>. Instead of demanding \(\dot{\theta} = 0\) instantly, it permits a bounded ascent rate that tapers smoothly to zero as \(\theta\) nears \(\theta_{\text{ref}}\):
+    </p>
+    <div class="math-block">
+      $$q_{\text{ref}}(\theta) = \mathrm{clamp}\Big(k_q (\theta_{\text{ref}} - \theta_{\text{pred}}), \; -q_{\max}, \; q_{\max}\Big)$$
+      $$T_{\text{ceiling}} = \mathrm{clamp}\Big(T_{\text{eq}}(\theta) - K_p (\theta_{\text{pred}} - \theta_{\text{ref}}) - K_d (\dot{\theta} - q_{\text{ref}}) - K_i \int e \, dt, \; 0, \; T_{\text{rider}}\Big)$$
+    </div>
+
+    <h2>4. Experimental Results Across 75 Simulation Runs</h2>
+    <p>
+      The simulator was evaluated across 9 scenarios, 5 control algorithms, and a 30-case parameter sensitivity study. Every run executes deterministically at a 2 ms plant step with seeded pseudo-random noise.
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Scenario</th>
+          <th>Controller</th>
+          <th>Classification</th>
+          <th>Airborne RMSE</th>
+          <th>Overshoot</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ideal, low delay (10 ms)</td>
+          <td>Feedforward PD</td>
+          <td><strong>Feasible tracking</strong></td>
+          <td>2.54°</td>
+          <td>0.99°</td>
+        </tr>
+        <tr>
+          <td>Ideal, low delay (10 ms)</td>
+          <td>Predictive Shooting</td>
+          <td>Limited / Partial</td>
+          <td>9.15°</td>
+          <td>0.00°</td>
+        </tr>
+        <tr>
+          <td>Ideal, low delay (10 ms)</td>
+          <td>No Assist</td>
+          <td>Safety Failure (Loop)</td>
+          <td>12.51°</td>
+          <td>29.09°</td>
+        </tr>
+        <tr>
+          <td>Insufficient throttle (40%)</td>
+          <td>Feedforward PD</td>
+          <td>Physically Unreachable</td>
+          <td>6.24°</td>
+          <td>0.00°</td>
+        </tr>
+        <tr>
+          <td>Wet surface (\(\mu = 0.55\))</td>
+          <td>All Controllers</td>
+          <td>Physically Unreachable</td>
+          <td>10.31°</td>
+          <td>0.00°</td>
+        </tr>
+        <tr>
+          <td>Actuator Transport Delay (100 ms)</td>
+          <td>All Controllers</td>
+          <td>Safety Failure (Loop)</td>
+          <td>12.2° – 22.6°</td>
+          <td>29.8° – 50.2°</td>
+        </tr>
+        <tr>
+          <td>Heavy sensor noise + jitter</td>
+          <td>Feedforward PD</td>
+          <td>Limited / Partial</td>
+          <td>10.66°</td>
+          <td>16.73°</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout">
+      <strong>Why did the Predictive Controller (NMPC baseline) underperform?</strong><br/>
+      In our experiments, the direct forward-shooting predictive controller achieved 9.15° RMSE compared to 2.54° for the tuned feedforward PD. Why? Because constrained direct shooting in pure real-time JavaScript used a coarse control discretization (5 candidate torque levels over a 300 ms horizon). The feedforward PD, by contrast, evaluates the exact physical holding torque analytically every 10 ms.
+    </div>
+
+    <h2>5. Bridging to the Real Bike: The Actuator Interface Problem</h2>
+    <p>
+      With simulation verifying the physics and control limits, the next question was how to run this on my physical 2020 BMW S1000RR. 
+      This is where academic theory meets commercial automotive architecture:
+    </p>
+    <ul>
+      <li><strong>alpha Racing confirmation:</strong> Peter Schouten (Head of Race Electronics at alpha Racing) confirmed that the stock BMW BMS-O ECU does <em>not</em> accept external torque-limit commands over the CAN-bus. The internal wheelie control is fixed firmware with six predefined gain profiles calibrated for a 1–2° pitch reference.</li>
+      <li><strong>Why not spoof CAN IMU data?</strong> Tricking the factory ECU by faking wheel speeds or pitch rates is an unsafe man-in-the-middle hack. The factory ECU performs multi-channel cross-checks (front wheel vs. rear wheel vs. engine RPM vs. 6-axis IMU). Falsifying one signal triggers ECU limp-home fault codes and risks unpredictable ABS/DTC cuts.</li>
+      <li><strong>The Solution (Path 3 — Throttle-Demand Limiting):</strong> Rather than attempting to rewrite BMW's safety-critical ignition and fuel management, an external embedded controller acts as a dynamic rider-demand governor on the electronic twist grip:
+        <div class="math-block">
+          $$u_{\text{commanded}}(t) = \min\big(u_{\text{rider}}(t), \; u_{\text{allowed}}(t)\big)$$
+        </div>
+        The factory ECU retains complete control over ShiftCam variable valve timing, ignition advance, knock control, and throttle body positioning, while our external board smoothly bounds the rider's electronic throttle request.
+      </li>
+    </ul>
+
+    <h2>6. The Control Pipeline: Which Part of the Code Controls the Motorcycle?</h2>
+    <p>
+      When deployed, the program executes a real-time control loop every 10 milliseconds (100 Hz), flowing through five dedicated software modules:
+    </p>
+    <div class="math-block" style="font-size:12px;line-height:1.6">
+[ Handlebar Twist Grip ] ──► [ 1. Sensing &amp; Filtering ] (src/can_bus.cpp &amp; src/throttle_interceptor.cpp)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ 2. Pitch Dynamics &amp; Feedforward ] (src/pitch_controller.cpp)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ 3. Torque-to-Voltage Inversion ] (src/throttle_mapper.cpp)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ 4. Hardware DAC Voltage Output ] (src/throttle_interceptor.cpp)<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[ 5. Safety Supervisor &amp; Relays ] (src/safety_supervisor.cpp) ──► [ BMW BMS-O ECU ]
+    </div>
+
+    <h3>Stage 1: Sensing &amp; Ingestion (<code>src/can_bus.cpp</code> &amp; <code>src/throttle_interceptor.cpp</code>)</h3>
+    <p>
+      The CAN sniffer unpacks 100 Hz frames: 6-axis IMU pitch angle and pitch rate (<code>0x130</code>, <code>0x132</code>), ABS wheel speeds (<code>0x138</code>), and engine RPM (<code>0x140</code>). Redundant 12-bit ADC channels sample the twist grip voltages with a 60 Hz first-order digital filter to strip out vibration electrical noise.
+    </p>
+
+    <h3>Stage 2: The Decision Algorithm (<code>src/pitch_controller.cpp</code>)</h3>
+    <p>
+      <code>PitchController::update()</code> evaluates the equilibrium holding torque \(T_{\text{eq}}(\theta)\) required to balance gravity, adds pitch-rate governed PD feedback, and enforces the one-sided invariant: \(T_{\text{ceiling}} = \mathrm{clamp}(T_{\text{unconstrained}}, 0, T_{\text{rider}})\).
+    </p>
+
+    <h3>Stage 3: Torque-to-Voltage Inversion (<code>src/throttle_mapper.cpp</code>)</h3>
+    <p>
+      <code>ThrottleMapper::allowableThrottleFromTorque()</code> inverts the non-linear K67 torque curve to find allowable grip percentage: \(u_{\text{allowed}} = (T_{\text{ceiling}} / T_{\text{full}})^{1/1.65}\). It caps demand (\(u_{\text{commanded}} = \min(u_{\text{rider}}, u_{\text{allowed}})\)) and maps to redundant voltages: \(V_{\text{APS1}} \in [0.75\text{V}, 4.15\text{V}]\) and \(V_{\text{APS2}} = 0.5 \cdot V_{\text{APS1}}\).
+    </p>
+
+    <h3>Stage 4: Actuation via Hardware DAC (<code>src/throttle_interceptor.cpp</code>)</h3>
+    <p>
+      <code>ThrottleInterceptor::writeEcuVoltages()</code> presents these clamped analog voltages directly to the BMW BMS-O ECU. The ECU adjusts motorized Electronic Throttle Valves (ETV) to reduce airflow and engine power.
+    </p>
+
+    <h3>Stage 5: Failsafe Supervision (<code>src/safety_supervisor.cpp</code>)</h3>
+    <p>
+      Manages the dual DPDT bypass relays: rolling off throttle (&lt; 5%) drops authority instantly; pitch exceeding 35° cuts throttle to idle; and any watchdog freeze drops relays to physical factory wiring in under 3 ms.
+    </p>
+
+    <h2>7. Embedded Architecture: Raspberry Pi &amp; Teensy Coprocessor</h2>
+    <p>
+      Can this system run on a Raspberry Pi? <strong>Yes.</strong> Standard Linux kernels are not deterministic real-time operating systems, so to deploy safely:
+    </p>
+    <ul>
+      <li><strong>Teensy 4.1 (600 MHz ARM Cortex-M7):</strong> Handles the hard real-time 100 Hz control loop, 12-bit ADC reading of the Twist Grip Sensor, hardware watchdog, and dual DPDT fail-safe bypass relays.</li>
+      <li><strong>Raspberry Pi Compute Module 4 (CM4):</strong> Runs Raspberry Pi OS Lite patched with the <code>PREEMPT_RT</code> real-time Linux kernel. It interfaces to the BMW CAN bus via a Waveshare 2-CH CAN HAT (MCP2518FD on SPI), acts as the high-speed telemetry server, and executes as a background <code>systemd</code> service.</li>
+    </ul>
+
+    <h3>Redundant Twist Grip Sensor (TGS) Signaling</h3>
+    <p>
+      The BMW K67 uses dual synchronized Hall-effect sensors:
+    </p>
+    <ul>
+      <li><strong>APS1:</strong> \(0.75\text{ V}\) (0% throttle) to \(4.15\text{ V}\) (100% throttle).</li>
+      <li><strong>APS2:</strong> Exactly <strong>50% of APS1</strong> (\(0.375\text{ V}\) to \(2.075\text{ V}\)).</li>
+    </ul>
+    <p>
+      The BMS-O ECU checks: \(|V_{\text{APS2}} - 0.5 \cdot V_{\text{APS1}}| \le 0.15\text{ V}\). If violated, it throws fault code <code>0x2721</code> and cuts throttle to idle. Our DAC output clamp calculates both channels in lockstep to guarantee continuous cross-plausibility.
+    </p>
+
+    <h2>8. Physical Vehicle Deployment on the S1000RR</h2>
+    <h3>Non-Destructive OEM Harness Tapping</h3>
+    <p>
+      I sourced genuine TE Connectivity Superseal male and female 6-pin connectors matching the BMW throttle grip harness under the right fairing. This created a plug-and-play inline Y-harness: power and ground pass through, while the signal wires route through the controller's normally-closed bypass relays.
+    </p>
+
+    <h3>Hardware Fail-Safe Bypass Relays</h3>
+    <p>
+      Dual DPDT 5V signal relays are placed between the twist grip and the ECU. When unpowered or in a fault state, internal mechanical springs hold the twist grip wires directly shorted to the ECU pins. If the controller loses power, browns out, or triggers a watchdog timeout, it drops back to 100% factory OEM wiring in under <strong>3 milliseconds</strong>.
+    </p>
+
+    <h2>9. Bench Testing &amp; Field Validation</h2>
+    <p>
+      Before track testing, the system was validated using our Python bench simulator (<code>tools/bench_hil_sim.py</code>) and a Rigol digital oscilloscope. Sweeping the throttle grip from 0% to 100% verified that DAC1 mirrored input voltage within 8 mV and DAC2 matched 0.5·DAC1 within 12 mV. Watchdog timeouts dropped the relays in 2.8 ms with zero glitching on the ECU lines.
+    </p>
+
+    <h3>Closed-Course Runway Test Results</h3>
+    <p>
+      During 2nd gear roll-ons at 50 km/h:
+    </p>
+    <ul>
+      <li>The rider opened the grip to ~80% WOT. As the front wheel lifted past 8°, the status indicator illuminated solid green.</li>
+      <li>As pitch neared the 11.5° target, the controller clamped the commanded throttle signal down to ~46%, smoothly checking the upward angular velocity.</li>
+      <li>The motorcycle stabilized at a steady front-wheel float at ~11° for 2.4 seconds while the rider maintained demand.</li>
+      <li>Rolling off the throttle immediately released authority, returning full engine braking and landing the wheel smoothly.</li>
+    </ul>
+
+    <h2>10. Conclusion &amp; The Road Ahead</h2>
+    <p>
+      This project proved that a <strong>one-sided, reduction-only supervisory controller</strong> can successfully stabilize a high-power motorcycle wheelie when the underlying rigid-body physics, dynamic load transfer, and actuator delays are accounted for.
+    </p>
+    <p>
+      By avoiding expensive $10,000 motorsport ECUs or unsafe CAN sensor spoofing, the system achieves predictable, bounded control while preserving factory BMW engine management and rider authority.
+    </p>
+    <p>
+      The complete C++ firmware, hardware wiring schematic, and 100 Hz fail-safe bypass relay architecture are open-source in the companion repository: 
+      <a href="https://github.com/mikhail0777/S1000RR_ECU_Cotnroller" target="_blank" class="hover-underline"><strong>github.com/mikhail0777/S1000RR_ECU_Cotnroller ↗</strong></a>.
+    </p>
+  </article>
+
+  <fieldset>
+    <legend>cat README.md</legend>
+    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+      <span>Motorcycle Dynamics Lab &middot; Written in JavaScript &amp; C++</span>
+      <a href="https://github.com/mikhail0777/S1000RR_PhysicsSimulation" target="_blank" class="hover-underline">github.com/mikhail0777/S1000RR_PhysicsSimulation ↗</a>
+    </div>
+  </fieldset>
+</div>
+
+<script>
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.remove('crt');
+    if (theme === 'terminal-green') document.documentElement.classList.add('crt');
+    if (theme === 'modern-dark' || theme === 'terminal-green') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+    document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById(`btn-theme-${theme}`);
+    if (btn) btn.classList.add('active');
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('theme') || 'modern-light';
+    setTheme(saved);
+  });
+</script>
+</body>
+</html>

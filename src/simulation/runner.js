@@ -11,6 +11,7 @@ export function stateSnapshot(state, controllerOutput, targetPitch) {
     permittedTorque: state.permittedTorque, engineTorque: state.engineTorque,
     wheelTorque: state.wheelTorque, engineRpm: state.engineRpm,
     rearOmega: state.rearOmega, frontOmega: state.frontOmega,
+    rearWheelAngle: state.rearWheelAngle, frontWheelAngle: state.frontWheelAngle,
     tireForce: state.tireForce, slip: state.slip,
     frontNormal: state.frontNormal, rearNormal: state.rearNormal,
     frontClearance: state.frontClearance, mode: state.mode,
